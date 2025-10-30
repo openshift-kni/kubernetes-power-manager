@@ -22,6 +22,7 @@ OCP_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212
 # Platform to build the images for.
 PLATFORM ?= linux/amd64
 # Target architecture.
+# Override GOARCH if target architecture is different from the build platform architecture.
 GOARCH = $(shell go env GOARCH)
 
 ## Location to install dependencies.
@@ -107,16 +108,24 @@ all: manifests generate install
 # Run tests
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 test: generate fmt vet manifests
-	go test -v ./... -coverprofile cover.out
+	CGO_ENABLED=0 go test -v ./... -coverprofile cover.out
+	cd power-optimization-library && CGO_ENABLED=0 go test -v ./... -coverprofile cover.out
 
 # Build manager binary
+# Override CGO_ENABLED=1 for building linux/amd64 with AMD uncore (E‑SMI).
+# Cross-compiling with CGO requires a target C toolchain; set CC accordingly.
+# Examples:
+#  macOS -> linux/amd64
+#    brew install zig
+#   CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC="zig cc -target x86_64-linux-gnu" make build
+CGO_ENABLED ?= 0
 build: generate manifests
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/manager build/manager/main.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/nodeagent build/nodeagent/main.go
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/manager build/manager/main.go
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/nodeagent build/nodeagent/main.go
 
 verify-build: gofmt test race coverage tidy clean verify-test
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/manager build/manager/main.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/nodeagent build/nodeagent/main.go	
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/manager build/manager/main.go
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -a -o build/bin/nodeagent build/nodeagent/main.go
 
 # Build the Manager and Node Agent images
 images: generate manifests
@@ -280,10 +289,10 @@ tidy:
 	go mod tidy
 
 verify-test: tidy
-	go test -count=1 -v ./...
+	CGO_ENABLED=0 go test -count=1 -v ./...
 
 race: tidy
-	CGO_ENABLED=1 go test -count=1 -race -v ./...
+	CGO_ENABLED=0 go test -count=1 -race -v ./...
 
 clean:
 	go clean --cache

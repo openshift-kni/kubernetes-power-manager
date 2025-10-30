@@ -35,14 +35,6 @@ func (m *mockCpuTopology) getEffectiveUncore() Uncore {
 	return nil
 }
 
-func (m *mockCpuTopology) getArchitecture() string {
-	ret := m.Called()
-	if ret.Get(0) != nil {
-		return ret.Get(0).(string)
-	}
-	return ""
-}
-
 func (m *mockCpuTopology) addCpu(u uint) (Cpu, error) {
 	ret := m.Called(u)
 
@@ -277,6 +269,9 @@ func (m *mockCpuCore) getID() uint {
 func setupTopologyTest(cpufiles map[string]map[string]string) func() {
 	origBasePath := basePath
 	basePath = "testing/cpus"
+	originalCpuIdentity := cpuIdentity
+	cpuIdentity.architecture = architectureX86_64
+	cpuIdentity.vendorID = vendorIDIntel
 
 	// backup pointer to function that gets all CPUs
 	// replace it with our controlled function
@@ -327,6 +322,8 @@ func setupTopologyTest(cpufiles map[string]map[string]string) func() {
 		basePath = origBasePath
 		// revert get number of system cpus function
 		getNumberOfCpus = origGetNumOfCpusFunc
+		// revert cpu identity
+		cpuIdentity = originalCpuIdentity
 	}
 }
 
@@ -334,7 +331,7 @@ type topologyTestSuite struct {
 	suite.Suite
 	origBasePath         string
 	origGetNumCpus       func() uint
-	origDiscoverTopology func(string) (Topology, error)
+	origDiscoverTopology func() (Topology, error)
 }
 
 func TestTopologyDiscovery(t *testing.T) {
@@ -415,7 +412,7 @@ func (s *topologyTestSuite) TestCpuImpl_discoverTopology() {
 	})
 	defer teardown()
 
-	topology, err := discoverTopology("x86_64")
+	topology, err := discoverTopology()
 	assert.NoError(t, err)
 	topologyObj := topology.(*cpuTopology)
 
@@ -504,9 +501,8 @@ func (s *topologyTestSuite) TestCpuPackage_addCpu() {
 	defer setupTopologyTest(map[string]map[string]string{})()
 	// fail to read fs
 	topo := &cpuTopology{
-		packages:     packageList{},
-		allCpus:      make(CpuList, 1),
-		architecture: "x86_64",
+		packages: packageList{},
+		allCpus:  make(CpuList, 1),
 	}
 	pkg := &cpuPackage{
 		topology: topo,
@@ -542,9 +538,8 @@ func (s *topologyTestSuite) TestCpuDie_addCpu() {
 	defer setupTopologyTest(map[string]map[string]string{})()
 	// fail to read fs
 	topo := &cpuTopology{
-		packages:     packageList{},
-		allCpus:      make(CpuList, 1),
-		architecture: "x86_64",
+		packages: packageList{},
+		allCpus:  make(CpuList, 1),
 	}
 	pkg := &cpuPackage{
 		topology: topo,

@@ -23,24 +23,18 @@ var coreTypes CoreTypeList
 // parent struct to store system topology
 type (
 	cpuTopology struct {
-		packages     packageList
-		allCpus      CpuList
-		uncore       Uncore
-		architecture string
+		packages packageList
+		allCpus  CpuList
+		uncore   Uncore
 	}
 
 	Topology interface {
 		topologyTypeObj
 		hasUncore
-		getArchitecture() string
 		Packages() *[]Package
 		Package(id uint) Package
 	}
 )
-
-func (s *cpuTopology) getArchitecture() string {
-	return s.architecture
-}
 
 func (s *cpuTopology) addCpu(cpuId uint) (Cpu, error) {
 	var socketId uint
@@ -134,12 +128,11 @@ func (c *cpuPackage) addCpu(cpuId uint) (Cpu, error) {
 	var err error
 	var cpu Cpu
 
-	architecture := c.topology.getArchitecture()
-	if architecture == "" {
+	if cpuIdentity.architecture == "" {
 		return nil, fmt.Errorf("empty CPU architecture in topology")
 	}
-	switch architecture {
-	case "x86_64":
+	switch cpuIdentity.architecture {
+	case architectureX86_64:
 		var dieId uint
 
 		if dieId, err = readCpuUintProperty(cpuId, dieIdFile); err != nil {
@@ -160,7 +153,7 @@ func (c *cpuPackage) addCpu(cpuId uint) (Cpu, error) {
 		if err != nil {
 			return nil, err
 		}
-	case "aarch64":
+	case architectureAArch64:
 		var clusterId uint
 		if clusterId, err = readCpuUintProperty(cpuId, clusterIdFile); err != nil {
 			return nil, err
@@ -369,13 +362,12 @@ type clusterList map[uint]Cluster
 
 type coreList map[uint]Core
 
-var discoverTopology = func(arch string) (Topology, error) {
+var discoverTopology = func() (Topology, error) {
 	numOfCores := getNumberOfCpus()
 	topology := &cpuTopology{
-		allCpus:      make(CpuList, numOfCores),
-		packages:     packageList{},
-		uncore:       defaultUncore,
-		architecture: arch,
+		allCpus:  make(CpuList, numOfCores),
+		packages: packageList{},
+		uncore:   defaultUncore,
 	}
 	for i := uint(0); i < numOfCores; i++ {
 		if _, err := topology.addCpu(i); err != nil {

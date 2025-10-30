@@ -24,12 +24,9 @@ type hostImpl struct {
 type Host interface {
 	SetName(name string)
 	GetName() string
+
 	GetFeaturesInfo() FeatureSet
-
-	SetArchitecture() error
 	GetArchitecture() string
-
-	SetVendorID() error
 	GetVendorID() string
 
 	GetReservedPool() Pool
@@ -53,14 +50,11 @@ func initHost(nodeName string) (Host, error) {
 		name:           nodeName,
 		exclusivePools: PoolList{},
 	}
-	host.featureStates = &featureList
 
-	if err := host.SetArchitecture(); err != nil {
-		return nil, fmt.Errorf("failed to set host architecture: %w", err)
-	}
-	if err := host.SetVendorID(); err != nil {
-		return nil, fmt.Errorf("failed to set host vendorId: %w", err)
-	}
+	// set host features, architecture and vendor ID
+	host.featureStates = &featureList
+	host.architecture = cpuIdentity.architecture
+	host.vendorId = cpuIdentity.vendorID
 
 	// create predefined pools
 	host.reservedPool = &reservedPoolType{poolImpl{
@@ -75,7 +69,7 @@ func initHost(nodeName string) (Host, error) {
 		host:  host,
 	}}
 
-	topology, err := discoverTopology(host.architecture)
+	topology, err := discoverTopology()
 	if err != nil {
 		log.Error(err, "failed to discover cpuTopology")
 		return nil, fmt.Errorf("failed to init host: %w", err)
@@ -83,15 +77,18 @@ func initHost(nodeName string) (Host, error) {
 	for _, cpu := range *topology.CPUs() {
 		cpu._setPoolProperty(host.reservedPool)
 	}
-
-	log.Info("discovered cpus", "cpus", len(*topology.CPUs()))
-
 	host.topology = topology
 
 	// create a shallow copy of pointers, changes to underlying cpu object will reflect in both lists,
 	// changes to each list will not affect the other
 	host.reservedPool.(*reservedPoolType).cpus = make(CpuList, len(*topology.CPUs()))
 	copy(host.reservedPool.(*reservedPoolType).cpus, *topology.CPUs())
+
+	log.Info("host initialized",
+		"name", host.name,
+		"architecture", host.architecture,
+		"vendorID", host.vendorId,
+		"discovered cpus", len(*host.topology.CPUs()))
 	return host, nil
 }
 
@@ -107,26 +104,8 @@ func (host *hostImpl) GetReservedPool() Pool {
 	return host.reservedPool
 }
 
-func (host *hostImpl) SetArchitecture() error {
-	arch, err := GetFromLscpu("^Architecture:")
-	if err != nil {
-		return fmt.Errorf("failed to get Architecture from lscpu: %w", err)
-	}
-	host.architecture = arch
-	return nil
-}
-
 func (host *hostImpl) GetArchitecture() string {
 	return host.architecture
-}
-
-func (host *hostImpl) SetVendorID() error {
-	vendorId, err := GetFromLscpu("^Vendor ID:")
-	if err != nil {
-		return fmt.Errorf("failed to get VendorID from lscpu: %w", err)
-	}
-	host.vendorId = vendorId
-	return nil
 }
 
 func (host *hostImpl) GetVendorID() string {

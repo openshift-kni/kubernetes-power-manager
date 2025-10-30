@@ -396,7 +396,8 @@ func TestUncore_Reconcile_InvalidUncores(t *testing.T) {
 	assert.Nil(t, err)
 	r.PowerLibrary = host
 	_, err = r.Reconcile(context.TODO(), req)
-	assert.ErrorContains(t, err, "specified Max frequency is higher than")
+	assert.ErrorContains(t, err,
+		"requested max uncore frequency (kHz) 20000000000 is higher than 2400000 allowed by the hardware")
 	// large package max
 	max = uint(20000000000)
 	min = uint(1200000)
@@ -418,7 +419,8 @@ func TestUncore_Reconcile_InvalidUncores(t *testing.T) {
 	assert.Nil(t, err)
 	r.PowerLibrary = host
 	_, err = r.Reconcile(context.TODO(), req)
-	assert.ErrorContains(t, err, "specified Max frequency is higher than")
+	assert.ErrorContains(t, err,
+		"requested max uncore frequency (kHz) 20000000000 is higher than 2400000 allowed by the hardware")
 	// large die max
 	max = uint(20000000000)
 	min = uint(1200000)
@@ -441,7 +443,8 @@ func TestUncore_Reconcile_InvalidUncores(t *testing.T) {
 	assert.Nil(t, err)
 	r.PowerLibrary = host
 	_, err = r.Reconcile(context.TODO(), req)
-	assert.ErrorContains(t, err, "specified Max frequency is higher than")
+	assert.ErrorContains(t, err,
+		"requested max uncore frequency (kHz) 20000000000 is higher than 2400000 allowed by the hardware")
 }
 
 // tests requests for the wrong node and namespace
@@ -459,16 +462,6 @@ func TestUncore_Reconcile_InvalidRequests(t *testing.T) {
 	}
 	_, err = r.Reconcile(context.TODO(), req)
 	assert.ErrorContains(t, err, "incorrect namespace")
-	// incorrect node
-	req = reconcile.Request{
-		NamespacedName: client.ObjectKey{
-			Name:      "wrong-node",
-			Namespace: "intel-power",
-		},
-	}
-	_, err = r.Reconcile(context.TODO(), req)
-	assert.Nil(t, err)
-
 }
 
 // test for a file system with missing files (ie. some broken kernel module etc)

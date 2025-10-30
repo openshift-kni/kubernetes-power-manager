@@ -152,11 +152,9 @@ The Kubernetes Power Manager supports all of the above use cases.
     > sudo modprobe amd_hsmp
     > ```
 
-    In ADM KPM, the following logic applies when configuring DF P-states:
+    The following logic applies when configuring DF P-states:
     - When min equals max, a fixed DF P-state is set. This disables automatic DF p-state scaling and locks the DF to operate at that specific performance level.
     - When min differs max, DF is allowed to dynamically scale between the specified DF P-states range.
-
-    This is not currently supported in KPM.
 
   - **ARM** - no equivalent supported
 
