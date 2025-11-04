@@ -196,7 +196,7 @@ func Fuzz_library(f *testing.F) {
 	}
 	teardownCpu := setupCpuScalingTests(cpuFreqsFiles)
 	teardownCstates := setupCpuCStatesTests(cstatesFiles)
-	teardownUncore := setupUncoreTests(uncoreFiles, "intel_uncore_frequency 16384 0 - Live 0xffffffffc09c8000")
+	teardownUncore := setupIntelUncoreTests(uncoreFiles, "intel_uncore_frequency 16384 0 - Live 0xffffffffc09c8000")
 	defer teardownCpu()
 	defer teardownCstates()
 	defer teardownUncore()

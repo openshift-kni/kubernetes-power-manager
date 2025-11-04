@@ -99,7 +99,8 @@ func (r *UncoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	// setting system wide uncore
 	if uncore.Spec.SysMax != nil && uncore.Spec.SysMin != nil {
-		p_uncore, err := power.NewUncore(*uncore.Spec.SysMin, *uncore.Spec.SysMax)
+		var p_uncore power.Uncore
+		p_uncore, err = power.NewUncore(*uncore.Spec.SysMin, *uncore.Spec.SysMax)
 		if err != nil {
 			logger.Error(err, "error creating uncore")
 			return ctrl.Result{Requeue: false}, err
@@ -118,7 +119,8 @@ func (r *UncoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				logger.Error(err, "max, min and package values must be set for die selector")
 				return ctrl.Result{Requeue: false}, err
 			}
-			p_uncore, err := power.NewUncore(*dieselect.Min, *dieselect.Max)
+			var p_uncore power.Uncore
+			p_uncore, err = power.NewUncore(*dieselect.Min, *dieselect.Max)
 			if err != nil {
 				logger.Error(err, "error creating uncore")
 				return ctrl.Result{Requeue: false}, err

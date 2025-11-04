@@ -21,7 +21,7 @@ COPY pkg/ pkg/
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GO111MODULE=on GOOS=${TARGETOS:-linux} GOARCH=$TARGETARCH go build -a -o manager main.go
+RUN CGO_ENABLED=0 GO111MODULE=on GOOS=${TARGETOS:-linux} GOARCH=$TARGETARCH go build --mod=vendor -a -o manager main.go
 
 # Final image
 FROM ${BASE_IMAGE}

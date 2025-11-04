@@ -14,6 +14,21 @@ import (
 
 var basePath = "/sys/devices/system/cpu"
 
+const (
+	vendorIDIntel = "GenuineIntel"
+	vendorIDAMD   = "AuthenticAMD"
+
+	architectureX86_64  = "x86_64"
+	architectureAArch64 = "aarch64"
+)
+
+// cpuIdentity stores the architecture and vendor ID of the CPU.
+// The values are set during initialization of the power library.
+var cpuIdentity = struct {
+	architecture string
+	vendorID     string
+}{}
+
 type featureID uint
 
 const (
@@ -129,6 +144,18 @@ func (set *FeatureSet) getFeatureIdError(id featureID) error {
 // if fatal errors occurred returns nil and error
 // if non-fatal error occurred Host object and error are returned
 func CreateInstance(hostName string) (Host, error) {
+	arch, err := GetFromLscpu("^Architecture:")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Architecture from lscpu: %w", err)
+	}
+	cpuIdentity.architecture = arch
+
+	vendorId, err := GetFromLscpu("^Vendor ID:")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VendorID from lscpu: %w", err)
+	}
+	cpuIdentity.vendorID = vendorId
+
 	allErrors := featureList.init()
 	if !featureList.anySupported() {
 		return nil, allErrors

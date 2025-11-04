@@ -74,7 +74,7 @@ func doConcurrentMoveCPUSetProfile(t *testing.T) {
 
 	// Setup features except for uncore
 	defer setupCpuCStatesTests(cpuCstatesMap)()
-	defer setupUncoreTests(map[string]map[string]string{}, "")()
+	defer setupIntelUncoreTests(map[string]map[string]string{}, "")()
 	defer setupCpuScalingTests(cpuConfigAll)()
 	defer setupTopologyTest(cpuTopologyMap)()
 
@@ -83,7 +83,6 @@ func doConcurrentMoveCPUSetProfile(t *testing.T) {
 	GetFromLscpu = TestGetFromLscpu
 
 	instance, err := CreateInstance("host")
-
 	assert.ErrorContainsf(t, err, "intel_uncore_frequency not loaded", "expecting uncore feature error")
 	assert.NotNil(t, instance)
 

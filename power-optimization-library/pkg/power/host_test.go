@@ -30,18 +30,9 @@ func (m *hostMock) SetName(name string) {
 func (m *hostMock) GetName() string {
 	return m.Called().String(0)
 }
-func (m *hostMock) SetArchitecture() error {
-	m.Called("x86_64")
-	return nil
-}
 
 func (m *hostMock) GetArchitecture() string {
 	return m.Called().String(0)
-}
-
-func (m *hostMock) SetVendorID() error {
-	m.Called("GenuineIntel")
-	return nil
 }
 
 func (m *hostMock) GetVendorID() string {
@@ -122,7 +113,7 @@ func TestHost_initHost(t *testing.T) {
 	const hostName = "host"
 
 	// get topology fail
-	discoverTopology = func(string) (Topology, error) { return new(mockCpuTopology), fmt.Errorf("error") }
+	discoverTopology = func() (Topology, error) { return new(mockCpuTopology), fmt.Errorf("error") }
 	host, err := initHost(hostName)
 	assert.Nil(t, host)
 	assert.Error(t, err)
@@ -135,7 +126,7 @@ func TestHost_initHost(t *testing.T) {
 	mockedCores := CpuList{core1, core2}
 	topObj := new(mockCpuTopology)
 	topObj.On("CPUs").Return(&mockedCores)
-	discoverTopology = func(string) (Topology, error) { return topObj, nil }
+	discoverTopology = func() (Topology, error) { return topObj, nil }
 	host, err = initHost(hostName)
 
 	assert.NoError(t, err)

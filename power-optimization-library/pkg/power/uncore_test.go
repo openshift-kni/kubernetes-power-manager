@@ -20,16 +20,20 @@ func (m *mockUncore) write(pkIgD, dieID uint) error {
 	return m.Called(pkIgD, dieID).Error(0)
 }
 
-func setupUncoreTests(files map[string]map[string]string, modulesFileContent string) func() {
+func setupIntelUncoreTests(files map[string]map[string]string, modulesFileContent string) func() {
 	origBasePath := basePath
 	basePath = "testing/cpus"
+
+	originalCpuIdentity := cpuIdentity
+	cpuIdentity.architecture = architectureX86_64
+	cpuIdentity.vendorID = vendorIDIntel
 
 	origModulesFile := kernelModulesFilePath
 	kernelModulesFilePath = basePath + "/kernelModules"
 
 	featureList[UncoreFeature].err = nil
 
-	if err := os.MkdirAll(filepath.Join(basePath, uncoreDirName), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Join(basePath, intelUncoreDirName), os.ModePerm); err != nil {
 		panic(err)
 	}
 
@@ -40,26 +44,26 @@ func setupUncoreTests(files map[string]map[string]string, modulesFileContent str
 	}
 
 	for pkgDie, freqFiles := range files {
-		pkgUncoreDir := filepath.Join(basePath, uncoreDirName, pkgDie)
+		pkgUncoreDir := filepath.Join(basePath, intelUncoreDirName, pkgDie)
 		if err := os.MkdirAll(filepath.Join(pkgUncoreDir), os.ModePerm); err != nil {
 			panic(err)
 		}
 		for file, value := range freqFiles {
 			switch file {
 			case "initMax":
-				if err := os.WriteFile(path.Join(pkgUncoreDir, uncoreInitMaxFreqFile), []byte(value), 0644); err != nil {
+				if err := os.WriteFile(path.Join(pkgUncoreDir, intelUncoreInitMaxFreqFile), []byte(value), 0644); err != nil {
 					panic(err)
 				}
 			case "initMin":
-				if err := os.WriteFile(path.Join(pkgUncoreDir, uncoreInitMinFreqFile), []byte(value), 0644); err != nil {
+				if err := os.WriteFile(path.Join(pkgUncoreDir, intelUncoreInitMinFreqFile), []byte(value), 0644); err != nil {
 					panic(err)
 				}
 			case "Max":
-				if err := os.WriteFile(path.Join(pkgUncoreDir, uncoreMaxFreqFile), []byte(value), 0644); err != nil {
+				if err := os.WriteFile(path.Join(pkgUncoreDir, intelUncoreMaxFreqFile), []byte(value), 0644); err != nil {
 					panic(err)
 				}
 			case "Min":
-				if err := os.WriteFile(path.Join(pkgUncoreDir, uncoreMinFreqFile), []byte(value), 0644); err != nil {
+				if err := os.WriteFile(path.Join(pkgUncoreDir, intelUncoreMinFreqFile), []byte(value), 0644); err != nil {
 					panic(err)
 				}
 			}
@@ -72,21 +76,73 @@ func setupUncoreTests(files map[string]map[string]string, modulesFileContent str
 		featureList[UncoreFeature].err = uninitialisedErr
 		kernelModulesFilePath = origModulesFile
 		basePath = origBasePath
+		cpuIdentity = originalCpuIdentity
 
 		defaultUncore = &uncoreFreq{}
 	}
 }
+
+func TestNewUncore(t *testing.T) {
+	var ucre Uncore
+	var err error
+	defer setupIntelUncoreTests(map[string]map[string]string{}, "")()
+
+	// Intel
+	// happy path
+	defaultUncore.min = 1_200_000
+	defaultUncore.max = 2_400_000
+
+	ucre, err = NewUncore(1_400_000, 2_200_000)
+	assert.NoError(t, err)
+	assert.Equal(t, uint(1_400_000), ucre.(*uncoreFreq).min)
+	assert.Equal(t, uint(2_200_000), ucre.(*uncoreFreq).max)
+
+	// max too high
+	ucre, err = NewUncore(1_400_000, 9999999)
+	assert.Nil(t, ucre)
+	assert.ErrorContains(t, err,
+		"requested max uncore frequency (kHz) 9999999 is higher than 2400000 allowed by the hardware")
+
+	// min too low
+	ucre, err = NewUncore(100, 2_200_000)
+	assert.Nil(t, ucre)
+	assert.ErrorContains(t, err,
+		"requested min uncore frequency (kHz) 100 is lower than 1200000 allowed by the hardware")
+
+	// AMD
+	defaultUncore.min = 0
+	defaultUncore.max = 2
+	cpuIdentity.vendorID = vendorIDAMD
+
+	// AMD max too high
+	ucre, err = NewUncore(1, 3)
+	assert.Nil(t, ucre)
+	assert.ErrorContains(t, err,
+		"requested max DF P-state 3 is higher than 2 allowed by the hardware")
+	// AMD max is lower than min
+	ucre, err = NewUncore(2, 1)
+	assert.Nil(t, ucre)
+	assert.ErrorContains(t, err,
+		"requested max DF P-state 1 cannot be lower than min DF P-state 2")
+
+	//arm uncore not supported
+	featureList[UncoreFeature].err = fmt.Errorf(
+		"uncore feature is not supported on aarch64 architecture (Ampere vendor)")
+	ucre, err = NewUncore(1, 2)
+	assert.ErrorIs(t, err, featureList[UncoreFeature].err)
+}
+
 func Test_initUncore(t *testing.T) {
 	var feature featureStatus
 	var teardown func()
-	teardown = setupUncoreTests(map[string]map[string]string{
+	teardown = setupIntelUncoreTests(map[string]map[string]string{
 		"package_00_die_00": {
 			"initMax": "999",
 			"initMin": "100",
 		},
 	},
 		"intel_cstates 14 0 - Live 0000ffffad212d\n"+
-			uncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
+			intelUncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
 			"rtscan 2342 0 -Live 0000ffff234ab4d",
 	)
 	defer teardown()
@@ -102,7 +158,7 @@ func Test_initUncore(t *testing.T) {
 	teardown()
 
 	// module not loaded
-	teardown = setupUncoreTests(map[string]map[string]string{},
+	teardown = setupIntelUncoreTests(map[string]map[string]string{},
 		"intel_cstates 14 0 - Live 0000ffffad212d\n"+
 			"rtscan 2342 0 -Live 0000ffff234ab4d",
 	)
@@ -111,9 +167,9 @@ func Test_initUncore(t *testing.T) {
 	teardown()
 
 	// no dies to manage
-	teardown = setupUncoreTests(map[string]map[string]string{},
+	teardown = setupIntelUncoreTests(map[string]map[string]string{},
 		"intel_cstates 14 0 - Live 0000ffffad212d\n"+
-			uncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
+			intelUncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
 			"rtscan 2342 0 -Live 0000ffff234ab4d",
 	)
 	feature = initUncore()
@@ -121,11 +177,11 @@ func Test_initUncore(t *testing.T) {
 	teardown()
 
 	// cant read init freqs
-	teardown = setupUncoreTests(map[string]map[string]string{
+	teardown = setupIntelUncoreTests(map[string]map[string]string{
 		"package_00_die_00": {},
 	},
 		"intel_cstates 14 0 - Live 0000ffffad212d\n"+
-			uncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
+			intelUncoreKmodName+" 324 0 - Live 0000ffff3ea334\n"+
 			"rtscan 2342 0 -Live 0000ffff234ab4d",
 	)
 	feature = initUncore()
@@ -133,38 +189,8 @@ func Test_initUncore(t *testing.T) {
 	teardown()
 }
 
-func TestNewUncore(t *testing.T) {
-	var ucre Uncore
-	var err error
-	defer setupUncoreTests(map[string]map[string]string{}, "")()
-
-	// happy path
-	defaultUncore.min = 1_200_000
-	defaultUncore.max = 2_400_000
-
-	ucre, err = NewUncore(1_400_000, 2_200_000)
-	assert.NoError(t, err)
-	assert.Equal(t, uint(1_400_000), ucre.(*uncoreFreq).min)
-	assert.Equal(t, uint(2_200_000), ucre.(*uncoreFreq).max)
-
-	// max too high
-	ucre, err = NewUncore(1_400_000, 9999999)
-	assert.Nil(t, ucre)
-	assert.ErrorContains(t, err, "Max frequency is higher than")
-
-	// min too low
-	ucre, err = NewUncore(100, 2_200_000)
-	assert.Nil(t, ucre)
-	assert.ErrorContains(t, err, "Min frequency is lower than")
-
-	//uncore not supported
-	featureList[UncoreFeature].err = fmt.Errorf("uncore borked")
-	ucre, err = NewUncore(1_400_000, 2_200_000)
-	assert.ErrorIs(t, err, featureList[UncoreFeature].err)
-}
-
 func TestUncoreFreq_write(t *testing.T) {
-	defer setupUncoreTests(map[string]map[string]string{
+	defer setupIntelUncoreTests(map[string]map[string]string{
 		"package_00_die_00": {
 			"Max": "999",
 			"Min": "100",
@@ -179,10 +205,10 @@ func TestUncoreFreq_write(t *testing.T) {
 	err := uncore.write(1, 0)
 	assert.NoError(t, err)
 
-	value, _ := readUncoreProperty(1, 0, uncoreMinFreqFile)
+	value, _ := readUncoreProperty(1, 0, intelUncoreMinFreqFile)
 	assert.Equal(t, uint(1), value)
 
-	value, _ = readUncoreProperty(1, 0, uncoreMaxFreqFile)
+	value, _ = readUncoreProperty(1, 0, intelUncoreMaxFreqFile)
 	assert.Equal(t, uint(9323), value)
 
 	// write to non-existing file
