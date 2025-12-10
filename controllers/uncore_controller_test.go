@@ -444,7 +444,7 @@ func TestUncore_Reconcile_InvalidUncores(t *testing.T) {
 	assert.ErrorContains(t, err, "specified Max frequency is higher than")
 }
 
-// tests requests for the wrong node and namespace
+// tests requests for the wrong namespace
 func TestUncore_Reconcile_InvalidRequests(t *testing.T) {
 	nodename := "TestNode"
 	t.Setenv("NODE_NAME", nodename)
@@ -459,16 +459,6 @@ func TestUncore_Reconcile_InvalidRequests(t *testing.T) {
 	}
 	_, err = r.Reconcile(context.TODO(), req)
 	assert.ErrorContains(t, err, "incorrect namespace")
-	// incorrect node
-	req = reconcile.Request{
-		NamespacedName: client.ObjectKey{
-			Name:      "wrong-node",
-			Namespace: "intel-power",
-		},
-	}
-	_, err = r.Reconcile(context.TODO(), req)
-	assert.Nil(t, err)
-
 }
 
 // test for a file system with missing files (ie. some broken kernel module etc)

@@ -108,6 +108,7 @@ all: manifests generate install
 ENVTEST_ASSETS_DIR = $(shell pwd)/testbin
 test: generate fmt vet manifests
 	go test -v ./... -coverprofile cover.out
+	cd power-optimization-library && go test -v ./... -coverprofile cover.out
 
 # Build manager binary
 build: generate manifests
