@@ -33,8 +33,8 @@ func Test_writeStatusErrors(t *testing.T) {
 	var ctx = context.Background()
 	clientMockObj := mock.Mock{}
 	clientFuncs := interceptor.Funcs{
-		SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-			return clientMockObj.MethodCalled("SubResourceUpdate", ctx, client, subResourceName, obj, opts).Error(0)
+		SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+			return clientMockObj.MethodCalled("SubResourcePatch", ctx, client, subResourceName, obj, opts).Error(0)
 		},
 	}
 	clientStatusWriter := fakeClient.NewClientBuilder().WithInterceptorFuncs(clientFuncs).Build().Status()
@@ -68,7 +68,7 @@ func Test_writeStatusErrors(t *testing.T) {
 			UID: "not empty",
 		},
 	}
-	clientMockObj.On("SubResourceUpdate", ctx, mock.Anything, "status", &powerv1.PowerWorkload{
+	clientMockObj.On("SubResourcePatch", ctx, mock.Anything, "status", &powerv1.PowerWorkload{
 		ObjectMeta: v1.ObjectMeta{
 			UID: "not empty",
 		},
@@ -77,7 +77,7 @@ func Test_writeStatusErrors(t *testing.T) {
 				Errors: []string{"err1"},
 			},
 		},
-	}, mock.Anything).Return(nil)
+	}, mock.Anything, mock.Anything).Return(nil)
 	errorList = fmt.Errorf("err1")
 	assert.Nil(t, writeUpdatedStatusErrsIfRequired(ctx, clientStatusWriter, object, errorList), "API should get updated with object with errors")
 
@@ -89,7 +89,7 @@ func Test_writeStatusErrors(t *testing.T) {
 
 	clientMockObj = mock.Mock{}
 	updateErr := fmt.Errorf("update error")
-	clientMockObj.On("SubResourceUpdate", ctx, mock.Anything, "status", mock.Anything, mock.Anything).Return(updateErr)
+	clientMockObj.On("SubResourcePatch", ctx, mock.Anything, "status", mock.Anything, mock.Anything, mock.Anything).Return(updateErr)
 	assert.ErrorIs(t, writeUpdatedStatusErrsIfRequired(ctx, clientStatusWriter, object, fmt.Errorf("err2")), updateErr, "error updating APi should return that error")
 
 }

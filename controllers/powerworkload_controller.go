@@ -18,11 +18,10 @@ package controllers
 
 import (
 	"context"
+	e "errors"
 	"fmt"
 	"os"
 	"strings"
-
-	e "errors"
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,24 +93,12 @@ func (r *PowerWorkloadReconciler) Reconcile(c context.Context, req ctrl.Request)
 			// and we need to remove it from the power library here. If the profile doesn't exist, then
 			// the power library will have deleted it for us
 			if req.NamespacedName.Name == sharedPowerWorkloadName {
-				movedCores := *r.PowerLibrary.GetSharedPool().Cpus()
-				pools := r.PowerLibrary.GetAllExclusivePools()
-				for _, pool := range *pools {
-					if strings.Contains(pool.Name(), nodeName+"-reserved-") {
-						movedCores = append(movedCores, *pool.Cpus()...)
-						if err := pool.Remove(); err != nil {
-							logger.Error(err, "failed to remove reserved pool")
-							return ctrl.Result{}, err
-						}
-					}
-				}
-				err = r.PowerLibrary.GetReservedPool().MoveCpus(movedCores)
-				if err != nil {
-					logger.Error(err, "failed to return all non exclusive cores to default reserved pool")
+				if err := r.cleanupSharedWorkloadPools(nodeName, &logger); err != nil {
+					logger.Error(err, "failed to reset shared workload on node")
 					return ctrl.Result{}, err
 				}
-				sharedPowerWorkloadName = ""
-			} else {
+			} else if strings.HasSuffix(req.NamespacedName.Name, "-"+nodeName) {
+				// Only the node that owns the workload should remove its local pool.
 				pool := r.PowerLibrary.GetExclusivePool(strings.ReplaceAll(req.NamespacedName.Name, ("-" + nodeName), ""))
 				if pool != nil {
 					err = pool.Remove()
@@ -127,16 +115,10 @@ func (r *PowerWorkloadReconciler) Reconcile(c context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Set the name of the workload node for non shared PowerWorkloads.
-	workload.Status.WorkloadNodes.Name = nodeName
-	err = r.Client.Status().Update(context.TODO(), workload)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// If there are multiple nodes the shared power workload's node selector satisfies we need to fail here before anything is done
-	logger.V(5).Info("checking the node elector is satisfied with the shared power workload")
+	// Handle shared workload.
 	if workload.Spec.AllCores {
+		// If there are multiple nodes the shared power workload's node selector satisfies we need to fail here before anything is done
+		logger.V(5).Info("checking the node elector is satisfied with the shared power workload")
 		labelledNodeList := &corev1.NodeList{}
 		listOption := workload.Spec.PowerNodeSelector
 
@@ -146,10 +128,36 @@ func (r *PowerWorkloadReconciler) Reconcile(c context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 
-		// If there were no nodes that matched the provided labels, check the node info of the workload for a name
-		logger.V(5).Info("checking the node info to see if the node name has been provided")
-		if (len(labelledNodeList.Items) == 0 && workload.Status.WorkloadNodes.Name != nodeName) || !util.NodeNameInNodeList(nodeName, labelledNodeList.Items) {
+		claimedByNode := workload.Status.WorkloadNodes.Name
+		matchesThisNode := util.NodeNameInNodeList(nodeName, labelledNodeList.Items)
+		if len(listOption) == 0 || !matchesThisNode {
+			// If the selector is cleared or no longer matches this node and we currently own it,
+			// gracefully cleanup local pools and clear the ownership in the status.
+			if claimedByNode == nodeName {
+				logger.Info("shared workload selector no longer matches this node, "+
+					"cleaning up local pools and clearing ownership", "nodeName", nodeName)
+				if err = r.cleanupSharedWorkloadPools(nodeName, &logger); err != nil {
+					return ctrl.Result{}, err
+				}
+				if err = r.patchWorkloadStatusOwnerNode(c, workload, ""); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+			// Not eligible on this node and not the owner.
 			return ctrl.Result{}, nil
+		}
+
+		// If the shared workload matches this node but is already claimed by a different node, log an error and return.
+		if claimedByNode != "" && claimedByNode != nodeName {
+			logger.Error(fmt.Errorf("shared workload already claimed"),
+				"Per-node shared workload is already claimed by another node",
+				"claimedByNode", claimedByNode, "nodeName", nodeName)
+			return ctrl.Result{}, nil
+		}
+
+		// Patch the workload status to set the owner node name.
+		if err = r.patchWorkloadStatusOwnerNode(c, workload, nodeName); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		logger.V(5).Info("verifying there is only one shared power workload and if there is more than one delete this instance")
@@ -257,62 +265,118 @@ func (r *PowerWorkloadReconciler) Reconcile(c context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Handle exclusive workload
-	if workload.Status.WorkloadNodes.Name == nodeName {
-		poolFromLibrary := r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile)
-		if poolFromLibrary == nil {
-			poolDoesNotExistError := errors.NewServiceUnavailable(fmt.Sprintf("pool '%s' does not exist in the power library", workload.Spec.PowerProfile))
-			logger.Error(poolDoesNotExistError, "error retrieving the pool from the power library")
-			return ctrl.Result{Requeue: false}, poolDoesNotExistError
-		}
+	// Handle exclusive workload.
+	if !strings.HasSuffix(workload.Name, "-"+nodeName) {
+		logger.V(5).Info("ignoring exclusive workload not owned by this node", "nodeName", nodeName)
+		return ctrl.Result{}, nil
+	}
 
-		logger.V(5).Info("updating the CPU list in the power library")
-		cores := poolFromLibrary.Cpus().IDs()
-		coresToRemoveFromLibrary := detectCoresRemoved(cores, workload.Status.WorkloadNodes.CpuIds, &logger)
-		coresToBeAddedToLibrary := detectCoresAdded(cores, workload.Status.WorkloadNodes.CpuIds, &logger)
+	// Ensure the workload node name is correctly recorded.
+	if err = r.patchWorkloadStatusOwnerNode(c, workload, nodeName); err != nil {
+		return ctrl.Result{}, err
+	}
 
-		if len(coresToRemoveFromLibrary) > 0 {
-			err = r.PowerLibrary.GetSharedPool().MoveCpuIDs(coresToRemoveFromLibrary)
-			if err != nil {
-				logger.Error(err, "error updating the power library CPU list")
-				return ctrl.Result{}, err
-			}
-		}
+	poolFromLibrary := r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile)
+	if poolFromLibrary == nil {
+		poolDoesNotExistError := errors.NewServiceUnavailable(fmt.Sprintf("pool '%s' does not exist in the power library", workload.Spec.PowerProfile))
+		logger.Error(poolDoesNotExistError, "error retrieving the pool from the power library")
+		return ctrl.Result{Requeue: false}, poolDoesNotExistError
+	}
 
-		if len(coresToBeAddedToLibrary) > 0 {
-			err = r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile).MoveCpuIDs(coresToBeAddedToLibrary)
-			if err != nil {
-				logger.Error(err, "error updating the power library CPU list")
-				return ctrl.Result{}, err
-			}
-		}
+	logger.V(5).Info("updating the CPU list in the power library")
+	cores := poolFromLibrary.Cpus().IDs()
+	coresToRemoveFromLibrary := detectCoresRemoved(cores, workload.Status.WorkloadNodes.CpuIds, &logger)
+	coresToBeAddedToLibrary := detectCoresAdded(cores, workload.Status.WorkloadNodes.CpuIds, &logger)
 
-		// If the referenced PowerProfile defines a CPU scaling policy for DPDK polling
-		// workloads, delegate to the CPU scaling manager. It will dynamically tune
-		// per-CPU frequencies based on usage samples retrieved from DPDK telemetry
-		// when needed.
-		profile := &powerv1.PowerProfile{}
-		err = r.Client.Get(c, client.ObjectKey{
-			Namespace: IntelPowerNamespace,
-			Name:      workload.Spec.PowerProfile,
-		}, profile)
+	if len(coresToRemoveFromLibrary) > 0 {
+		err = r.PowerLibrary.GetSharedPool().MoveCpuIDs(coresToRemoveFromLibrary)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get power profile: %w", err)
-		}
-		if profile.Spec.CpuScalingPolicy != nil && profile.Spec.CpuScalingPolicy.WorkloadType == "polling-dpdk" {
-			// Ensure telemetry connections for all DPDK pods in this workload.
-			r.reconcileDPDKTelemetryClient(workload.Status.WorkloadNodes.Containers)
-
-			// Build scaling options for each CPU in this exclusive pool.
-			cpus := r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile).Cpus()
-			scalingOpts := r.generateCPUScalingOpts(profile.Spec.CpuScalingPolicy, cpus)
-
-			// Hand over to the scaling manager to manage per-CPU scaling.
-			r.CPUScalingManager.ManageCPUScaling(scalingOpts)
+			logger.Error(err, "error updating the power library CPU list")
+			return ctrl.Result{}, err
 		}
 	}
 
+	if len(coresToBeAddedToLibrary) > 0 {
+		err = r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile).MoveCpuIDs(coresToBeAddedToLibrary)
+		if err != nil {
+			logger.Error(err, "error updating the power library CPU list")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// If the referenced PowerProfile defines a CPU scaling policy for DPDK polling
+	// workloads, delegate to the CPU scaling manager. It will dynamically tune
+	// per-CPU frequencies based on usage samples retrieved from DPDK telemetry
+	// when needed.
+	profile := &powerv1.PowerProfile{}
+	err = r.Client.Get(c, client.ObjectKey{
+		Namespace: IntelPowerNamespace,
+		Name:      workload.Spec.PowerProfile,
+	}, profile)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get power profile: %w", err)
+	}
+	if profile.Spec.CpuScalingPolicy != nil && profile.Spec.CpuScalingPolicy.WorkloadType == "polling-dpdk" {
+		// Ensure telemetry connections for all DPDK pods in this workload.
+		r.reconcileDPDKTelemetryClient(workload.Status.WorkloadNodes.Containers)
+
+		// Build scaling options for each CPU in this exclusive pool.
+		cpus := r.PowerLibrary.GetExclusivePool(workload.Spec.PowerProfile).Cpus()
+		scalingOpts := r.generateCPUScalingOpts(profile.Spec.CpuScalingPolicy, cpus)
+
+		// Hand over to the scaling manager to manage per-CPU scaling.
+		r.CPUScalingManager.ManageCPUScaling(scalingOpts)
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// cleanupSharedWorkloadPools cleans up local shared and reserved pools for a shared workload on this node.
+func (r *PowerWorkloadReconciler) cleanupSharedWorkloadPools(nodeName string, logger *logr.Logger) error {
+	movedCores := *r.PowerLibrary.GetSharedPool().Cpus()
+	pools := r.PowerLibrary.GetAllExclusivePools()
+	for _, pool := range *pools {
+		if strings.Contains(pool.Name(), nodeName+"-reserved-") {
+			movedCores = append(movedCores, *pool.Cpus()...)
+			if err := pool.Remove(); err != nil {
+				logger.Error(err, "failed to remove reserved pool", "pool", pool.Name())
+				return err
+			}
+		}
+	}
+	if err := r.PowerLibrary.GetReservedPool().MoveCpus(movedCores); err != nil {
+		logger.Error(err, "failed to return shared/reserved cores to default reserved pool")
+		return err
+	}
+
+	sharedPowerWorkloadName = ""
+	return nil
+}
+
+// patchWorkloadStatusOwnerNode patches the status.workloadNodes.name field using a conflict-safe status patch.
+func (r *PowerWorkloadReconciler) patchWorkloadStatusOwnerNode(ctx context.Context, workload *powerv1.PowerWorkload, nodeName string) error {
+	if workload.Status.WorkloadNodes.Name == nodeName {
+		// no change needed
+		return nil
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latestWorkload := &powerv1.PowerWorkload{}
+		if err := r.Client.Get(ctx, client.ObjectKey{
+			Namespace: workload.Namespace,
+			Name:      workload.Name,
+		}, latestWorkload); err != nil {
+			return fmt.Errorf("failed to get the workload: %w", err)
+		}
+		statusPatch := client.MergeFrom(latestWorkload.DeepCopy())
+
+		latestWorkload.Status.WorkloadNodes.Name = nodeName
+		if err := r.Client.Status().Patch(ctx, latestWorkload, statusPatch); err != nil {
+			return fmt.Errorf("failed to patch the workload node name: %w", err)
+		}
+		workload.Status.WorkloadNodes.Name = nodeName
+		return nil
+	})
 }
 
 func detectCoresRemoved(originalCoreList []uint, updatedCoreList []uint, logger *logr.Logger) []uint {
@@ -470,7 +534,12 @@ func (r *PowerWorkloadReconciler) generateCPUScalingOpts(scalingPolicy *powerv1.
 
 func (r *PowerWorkloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&powerv1.PowerWorkload{}).
+		For(&powerv1.PowerWorkload{},
+			builder.WithPredicates(
+				predicate.NewPredicateFuncs(func(obj client.Object) bool {
+					return r.shouldEnqueueWorkloadForNode(obj)
+				})),
+		).
 		Watches(&powerv1.PowerProfile{},
 			handler.EnqueueRequestsFromMapFunc(r.powerProfileToWorkloadRequests),
 			builder.WithPredicates(predicate.Funcs{
@@ -493,13 +562,61 @@ func (r *PowerWorkloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// shouldEnqueueWorkloadForNode returns true if this node-agent should reconcile the workload.
+func (r *PowerWorkloadReconciler) shouldEnqueueWorkloadForNode(obj client.Object) bool {
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		return false
+	}
+
+	workload, ok := obj.(*powerv1.PowerWorkload)
+	if !ok {
+		return false
+	}
+
+	// Exclusive workloads are named <profile>-<nodeName>.
+	if !workload.Spec.AllCores {
+		return strings.HasSuffix(workload.Name, "-"+nodeName)
+	}
+
+	// If the shared workload is already claimed by a specific node, only enqueue on that node.
+	if workload.Status.WorkloadNodes.Name != "" {
+		return workload.Status.WorkloadNodes.Name == nodeName
+	}
+
+	// Shared workloads supposedly have a node selector associated with them.
+	// If no selector is provided in the shared workload, we can't identify the node it is associated with.
+	if len(workload.Spec.PowerNodeSelector) == 0 {
+		r.Log.Info("No node selector provided for shared workload, ignoring", "workload", workload.Name)
+		return false
+	}
+
+	// Otherwise, check if the current node matches the label selector map.
+	node := &corev1.Node{}
+	if err := r.Client.Get(context.TODO(), client.ObjectKey{Name: nodeName}, node); err != nil {
+		return true
+	}
+	for k, v := range workload.Spec.PowerNodeSelector {
+		if node.Labels[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
 // powerProfileToWorkloadRequests enqueues reconciliation requests for the
 // PowerWorkload that is associated with the given PowerProfile.
 func (r *PowerWorkloadReconciler) powerProfileToWorkloadRequests(ctx context.Context, obj client.Object) []reconcile.Request {
 	powerProfile := obj.(*powerv1.PowerProfile)
 	requests := []reconcile.Request{}
 
-	workloadName := fmt.Sprintf("%s-%s", powerProfile.Name, os.Getenv("NODE_NAME"))
+	// Only enqueue the PowerWorkload owned by this node-agent.
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		return requests
+	}
+
+	workloadName := fmt.Sprintf("%s-%s", powerProfile.Name, nodeName)
 	workload := &powerv1.PowerWorkload{}
 	if err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      workloadName,

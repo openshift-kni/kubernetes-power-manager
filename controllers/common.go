@@ -16,7 +16,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/util"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,11 +47,19 @@ func writeUpdatedStatusErrsIfRequired(ctx context.Context, statusWriter client.S
 	}
 	errList := util.UnpackErrsToStrings(objectErrors)
 	// no updates are needed
-	if reflect.DeepEqual(*errList, *object.GetStatusErrors()) {
+	if equality.Semantic.DeepEqual(*errList, *object.GetStatusErrors()) {
 		return err
 	}
+
+	// Use Patch for safer status update across multiple agents
+	orig, ok := object.DeepCopyObject().(client.Object)
+	if !ok {
+		return fmt.Errorf("object does not implement client.Object")
+	}
+	statusPatch := client.MergeFrom(orig)
+
 	object.SetStatusErrors(errList)
-	err = statusWriter.Update(ctx, object)
+	err = statusWriter.Patch(ctx, object, statusPatch)
 	if err != nil {
 		logr.FromContextOrDiscard(ctx).Error(err, "failed to write status update")
 	}
