@@ -49,6 +49,10 @@ OCP_VERSION=4.21
 OCP_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212
 # Platform to build the images for.
 PLATFORM ?= linux/amd64
+# Multi-arch platforms to build for.
+PLATFORMS ?= linux/amd64,linux/arm64
+# ARM64 variant for multi-arch builds
+ARM64_VARIANT ?= v8
 # Target architecture.
 GOARCH = $(shell go env GOARCH)
 
@@ -261,6 +265,82 @@ build-controller-ocp:
 
 build-agent-ocp:
 	$(IMGTOOL) build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" -f build/Dockerfile.nodeagent --platform $(PLATFORM) -t ${IMG_AGENT} .
+
+.PHONY: build-push-multiarch
+# Build and push multi-architecture images for both operator and agent
+# Set OCP=true for OpenShift builds (default: false)
+build-push-multiarch: generate manifests
+ifeq (true, $(OCP))
+	@echo "Building and pushing multi-arch OCP images for platforms: $(PLATFORMS)"
+else
+	@echo "Building and pushing multi-arch images for platforms: $(PLATFORMS)"
+endif
+	@echo "Operator: $(IMG)"
+	@echo "Agent: $(IMG_AGENT)"
+ifeq ($(IMGTOOL),podman)
+	# Podman: build for each platform, create manifest, and push
+ifeq (true, $(OCP))
+	@for platform in $$(echo $(PLATFORMS) | tr ',' ' '); do \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building OCP operator for $$platform..."; \
+		$(IMGTOOL) build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" --build-arg="MANIFEST=build/manifests/ocp/power-node-agent-ds.yaml" -f build/Dockerfile --platform $$platform -t ${IMG}-$$arch .; \
+		echo "Building OCP agent for $$platform..."; \
+		$(IMGTOOL) build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" -f build/Dockerfile.nodeagent --platform $$platform -t ${IMG_AGENT}-$$arch .; \
+	done
+else
+	@for platform in $$(echo $(PLATFORMS) | tr ',' ' '); do \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building operator for $$platform..."; \
+		$(IMGTOOL) build -f build/Dockerfile --platform $$platform -t ${IMG}-$$arch .; \
+		echo "Building agent for $$platform..."; \
+		$(IMGTOOL) build -f build/Dockerfile.nodeagent --platform $$platform -t ${IMG_AGENT}-$$arch .; \
+	done
+endif
+	@echo "Creating multi-arch manifests..."
+	$(IMGTOOL) manifest exists ${IMG} && $(IMGTOOL) manifest rm ${IMG} || true
+	$(IMGTOOL) rmi ${IMG} 2>/dev/null || true
+	$(IMGTOOL) manifest create ${IMG}
+	@for platform in $$(echo $(PLATFORMS) | tr ',' ' '); do \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		if [ "$$arch" = "arm64" ]; then \
+			$(IMGTOOL) manifest add --arch $$arch --variant $(ARM64_VARIANT) ${IMG} ${IMG}-$$arch; \
+		else \
+			$(IMGTOOL) manifest add --arch $$arch --variant "" ${IMG} ${IMG}-$$arch; \
+		fi; \
+	done
+	$(IMGTOOL) manifest exists ${IMG_AGENT} && $(IMGTOOL) manifest rm ${IMG_AGENT} || true
+	$(IMGTOOL) rmi ${IMG_AGENT} 2>/dev/null || true
+	$(IMGTOOL) manifest create ${IMG_AGENT}
+	@for platform in $$(echo $(PLATFORMS) | tr ',' ' '); do \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		if [ "$$arch" = "arm64" ]; then \
+			$(IMGTOOL) manifest add --arch $$arch --variant $(ARM64_VARIANT) ${IMG_AGENT} ${IMG_AGENT}-$$arch; \
+		else \
+			$(IMGTOOL) manifest add --arch $$arch --variant "" ${IMG_AGENT} ${IMG_AGENT}-$$arch; \
+		fi; \
+	done
+	@echo "Pushing multi-arch manifests..."
+	$(IMGTOOL) manifest push ${IMG}
+	$(IMGTOOL) manifest push ${IMG_AGENT}
+	@echo "Cleaning up architecture-specific tags..."
+	@for platform in $$(echo $(PLATFORMS) | tr ',' ' '); do \
+		arch=$$(echo $$platform | cut -d'/' -f2); \
+		$(IMGTOOL) rmi ${IMG}-$$arch 2>/dev/null || true; \
+		$(IMGTOOL) rmi ${IMG_AGENT}-$$arch 2>/dev/null || true; \
+	done
+else
+	# Docker: use buildx for multi-platform builds and push directly
+ifeq (true, $(OCP))
+	@echo "Using docker buildx for multi-platform OCP builds..."
+	$(IMGTOOL) buildx build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" --build-arg="MANIFEST=build/manifests/ocp/power-node-agent-ds.yaml" -f build/Dockerfile --platform $(PLATFORMS) -t ${IMG} --push .
+	$(IMGTOOL) buildx build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" -f build/Dockerfile.nodeagent --platform $(PLATFORMS) -t ${IMG_AGENT} --push .
+else
+	@echo "Using docker buildx for multi-platform builds..."
+	$(IMGTOOL) buildx build -f build/Dockerfile --platform $(PLATFORMS) -t ${IMG} --push .
+	$(IMGTOOL) buildx build -f build/Dockerfile.nodeagent --platform $(PLATFORMS) -t ${IMG_AGENT} --push .
+endif
+endif
+	@echo "Multi-arch images built and pushed successfully"
 
 .PHONY: docker-push controller-gen kustomize bundle bundle-build bundle-push
 # Push the image
