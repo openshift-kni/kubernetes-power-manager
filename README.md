@@ -224,19 +224,6 @@ The Kubernetes Power Manager supports building multi-architecture container imag
 
 ### Prerequisites
 
-**For Docker:**
-
-Docker buildx must be installed and configured:
-
-```console
-# Check if buildx is available
-docker buildx version
-
-# Create a new builder instance (one-time setup)
-docker buildx create --name multiarch --use
-docker buildx inspect --bootstrap
-```
-
 **For Podman:**
 
 Podman 3.0+ with native multi-arch support:
@@ -253,6 +240,19 @@ sudo dnf install qemu-user-static      # Fedora/RHEL
 # Make sure Rosetta is enabled when building on Apple Silicon
 podman machine init # customize cpus, disk-size, memory if required
 podman machine start
+```
+
+**For Docker:**
+
+Docker buildx must be installed and configured:
+
+```console
+# Check if buildx is available
+docker buildx version
+
+# Create a new builder instance (one-time setup)
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
 ```
 
 ### Build Multi-Arch Images
@@ -273,7 +273,7 @@ VERSION=latest \
 make build-push-multiarch
 ```
 
-For OpenShift:
+For OpenShift (uses UBI base image and OCP-specific manifests):
 
 ```console
 OCP=true \
@@ -300,11 +300,11 @@ make build-push-multiarch
 After pushing, verify the multi-arch manifest:
 
 ```console
-# Using Docker
-docker buildx imagetools inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
-
 # Using Podman
 podman manifest inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
+
+# Using Docker
+docker buildx imagetools inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
 ```
 
 ## Deploying the Kubernetes Power Manager using Helm
