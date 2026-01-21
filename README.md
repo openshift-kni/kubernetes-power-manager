@@ -218,6 +218,95 @@ The Kubernetes Power Manager supports all of the above use cases.
   OCP=true IMG_AGENT=quay.io/<user/org>/power-node-agent:latest IMG=quay.io/<user/org>/power-operator:latest make install deploy
   ```
 
+## Building Multi-Architecture Images
+
+The Kubernetes Power Manager supports building multi-architecture container images for both the Power Operator and Power Node Agent. This allows you to create a single image tag that works across multiple architectures (e.g., AMD64 and ARM64).
+
+### Prerequisites
+
+**For Podman:**
+
+Podman 3.0+ with native multi-arch support:
+
+```console
+# Verify podman version (3.0+ required)
+podman version
+
+# On Linux: Ensure qemu-user-static is installed for cross-platform builds
+sudo apt-get install qemu-user-static  # Debian/Ubuntu
+sudo dnf install qemu-user-static      # Fedora/RHEL
+
+# On macOS: Initialize and start podman machine
+# Make sure Rosetta is enabled when building on Apple Silicon
+podman machine init # customize cpus, disk-size, memory if required
+podman machine start
+```
+
+**For Docker:**
+
+Docker buildx must be installed and configured:
+
+```console
+# Check if buildx is available
+docker buildx version
+
+# Create a new builder instance (one-time setup)
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
+```
+
+### Build Multi-Arch Images
+
+Build both operator and agent images for multiple architectures (default: linux/amd64 and linux/arm64):
+
+```console
+# Using Podman
+IMGTOOL=podman \
+IMAGE_REGISTRY=quay.io/<user/org> \
+VERSION=latest \
+make build-push-multiarch
+
+# Using Docker
+IMGTOOL=docker \
+IMAGE_REGISTRY=quay.io/<user/org> \
+VERSION=latest \
+make build-push-multiarch
+```
+
+For OpenShift (uses UBI base image and OCP-specific manifests):
+
+```console
+OCP=true \
+IMGTOOL=podman \
+IMAGE_REGISTRY=quay.io/<user/org> \
+VERSION=latest \
+make build-push-multiarch
+```
+
+### Customizing Target Platforms
+
+Override the default platforms (linux/amd64,linux/arm64):
+
+```console
+PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7 \
+IMGTOOL=podman \
+IMAGE_REGISTRY=quay.io/<user/org> \
+VERSION=latest \
+make build-push-multiarch
+```
+
+### Verifying Multi-Arch Images
+
+After pushing, verify the multi-arch manifest:
+
+```console
+# Using Podman
+podman manifest inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
+
+# Using Docker
+docker buildx imagetools inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
+```
+
 ## Deploying the Kubernetes Power Manager using Helm
 
 The Kubernetes Power Manager includes a helm chart for the latest releases, allowing the user to easily deploy
