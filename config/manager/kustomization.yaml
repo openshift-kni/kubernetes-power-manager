@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/openshift-kni/kubernetes-power-manager-operator
-  newTag: 4.22.0
+  newTag: 0.0.1

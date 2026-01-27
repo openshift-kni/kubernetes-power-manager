@@ -15,7 +15,7 @@ spec:
     spec:
       serviceAccountName: intel-power-node-agent
       containers:
-        - image: quay.io/openshift-kni/kubernetes-power-node-agent:4.22.0
+        - image: quay.io/openshift-kni/kubernetes-power-node-agent:0.0.1
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true

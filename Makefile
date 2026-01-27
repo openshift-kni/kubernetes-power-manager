@@ -1,7 +1,7 @@
 export PROJECT_NAME=kubernetes-power-manager
 KPM_NAMESPACE ?= intel-power
 # Current Operator version
-VERSION ?= 4.22.0
+VERSION ?= 0.0.1
 # Bundle version (without 'v' prefix for operator-sdk)
 BUNDLE_VERSION := $(shell echo $(VERSION) | sed 's/^v//')
 # parameter used for helm chart image
@@ -44,7 +44,7 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(BUNDLE_VERSION) $(BUNDLE_METADATA_OPTS)
 
 # version of ocp being supported
-OCP_VERSION=4.21
+OCP_VERSION=4.22
 # image used for building the dockerfile for ocp
 OCP_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212
 # Platform to build the images for.
