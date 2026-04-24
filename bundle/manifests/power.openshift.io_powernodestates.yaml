@@ -190,6 +190,25 @@ spec:
                     - powerProfile
                     type: object
                 type: object
+              nodeInfo:
+                description: |-
+                  NodeInfo contains static node information written once by the PowerConfig controller.
+                  Acts as an SSA anchor: because this field is always present and owned, the status
+                  object is never empty.
+                  Owned by: PowerConfig controller
+                properties:
+                  architecture:
+                    description: Architecture is the CPU architecture of the node
+                      (e.g., "amd64", "arm64")
+                    type: string
+                  cpuCapacity:
+                    description: CPUCapacity is the total number of CPUs on the node
+                      (from node.Status.Capacity)
+                    type: integer
+                required:
+                - architecture
+                - cpuCapacity
+                type: object
               powerProfiles:
                 description: |-
                   PowerProfiles contains the status of power profiles on this node

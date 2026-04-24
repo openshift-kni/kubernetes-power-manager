@@ -25,9 +25,6 @@ import (
 
 // UncoreSpec defines the desired state of Uncore
 type UncoreSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// NodeSelector specifies which nodes this Uncore configuration applies to.
 	// If not specified, the config applies to all nodes running the Power Node Agent.
 	// +optional
@@ -45,9 +42,9 @@ type DieSelector struct {
 	Max     *uint `json:"max"`
 }
 
-// UncoreStatus defines the observed state of Uncore
+// UncoreStatus defines the observed state of Uncore.
+// Intentionally empty — all status is reported via PowerNodeState.
 type UncoreStatus struct {
-	StatusErrors `json:",inline,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -69,14 +66,6 @@ type UncoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Uncore `json:"items"`
-}
-
-func (ucnre *Uncore) SetStatusErrors(err *[]string) {
-	ucnre.Status.Errors = *err
-}
-
-func (ucnre *Uncore) GetStatusErrors() *[]string {
-	return &ucnre.Status.Errors
 }
 
 func init() {
