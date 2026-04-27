@@ -27,7 +27,6 @@ import (
 	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/util"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,35 +49,6 @@ func powerProfileFieldManager(profileName string) string {
 // ValidEppValues defines the valid EPP (Energy Performance Preference) values
 var ValidEppValues = []string{"performance", "balance_performance", "balance_power", "power"}
 
-// write errors to the status filed, pass nil to clear errors, will only do update resource is valid and not being deleted
-// if object already has the correct errors it will not be updated in the API
-func writeUpdatedStatusErrsIfRequired(ctx context.Context, statusWriter client.SubResourceWriter, object powerv1.PowerCRWithStatusErrors, objectErrors error) error {
-	var err error
-	// if invalid or marked for deletion don't do anything
-	if object.GetUID() == "" || object.GetDeletionTimestamp() != nil {
-		return err
-	}
-	errList := util.UnpackErrsToStrings(objectErrors)
-	// no updates are needed
-	if equality.Semantic.DeepEqual(*errList, *object.GetStatusErrors()) {
-		return err
-	}
-
-	// Use Patch for safer status update across multiple agents
-	orig, ok := object.DeepCopyObject().(client.Object)
-	if !ok {
-		return fmt.Errorf("object does not implement client.Object")
-	}
-	statusPatch := client.MergeFrom(orig)
-
-	object.SetStatusErrors(errList)
-	err = statusWriter.Patch(ctx, object, statusPatch)
-	if err != nil {
-		logr.FromContextOrDiscard(ctx).Error(err, "failed to write status update")
-	}
-	return err
-}
-
 // isValidEpp checks if a certain name corresponds to a valid EPP value.
 func isValidEpp(inputName string) bool {
 	for _, validEpp := range ValidEppValues {
@@ -89,36 +59,113 @@ func isValidEpp(inputName string) bool {
 	return false
 }
 
-// doesNodeMatchPowerProfileSelector checks if a PowerProfile should be applied to a specific node.
-func doesNodeMatchPowerProfileSelector(c client.Client, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
+// nodeMatchesSelector checks if a node's labels satisfy the given LabelSelector.
+// An empty selector (no matchLabels and no matchExpressions) matches all nodes.
+func nodeMatchesSelector(nodeLabels map[string]string, ls metav1.LabelSelector) (bool, error) {
+	if len(ls.MatchLabels) == 0 && len(ls.MatchExpressions) == 0 {
+		return true, nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(&ls)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(nodeLabels)), nil
+}
+
+// getActiveResourceName reads the currently active resource name from PowerNodeState status.
+// extractName extracts the active resource name from the PowerNodeState status — each controller
+// reads from a different status field (e.g., Uncore.Name vs CPUPools.Shared.PowerNodeConfig).
+func getActiveResourceName(ctx context.Context, c client.Reader, nodeName string, extractName func(*powerv1.PowerNodeStateStatus) string) (string, error) {
+	pns := &powerv1.PowerNodeState{}
+	pnsName := fmt.Sprintf("%s-power-state", nodeName)
+	if err := c.Get(ctx, client.ObjectKey{
+		Namespace: PowerNamespace,
+		Name:      pnsName,
+	}, pns); err != nil {
+		return "", err
+	}
+	return extractName(&pns.Status), nil
+}
+
+// filterByNodeSelector returns the items whose nodeSelector matches the given node labels.
+// getSelector extracts the LabelSelector from each item.
+// Items with invalid selectors are skipped with a log message.
+func filterByNodeSelector[T any](items []T, nodeLabels map[string]string, getSelector func(T) metav1.LabelSelector, getMeta func(T) metav1.ObjectMeta, logger logr.Logger) []T {
+	var matches []T
+	for _, item := range items {
+		match, err := nodeMatchesSelector(nodeLabels, getSelector(item))
+		if err != nil {
+			logger.Error(err, "invalid label selector", "resource", getMeta(item).Name)
+			continue
+		}
+		if match {
+			matches = append(matches, item)
+		}
+	}
+	return matches
+}
+
+// selectActiveOrOldest resolves which resource to apply when multiple candidates match a node.
+// Rules:
+//  1. If the currently active resource (by name) is still among matches, keep it (sticky).
+//  2. Otherwise, pick the oldest by creation timestamp, with name as alphabetical tiebreaker.
+//
+// getMeta extracts the ObjectMeta from each item, allowing this function to work with
+// any K8s resource type (Uncore, PowerNodeConfig, etc.).
+func selectActiveOrOldest[T any](matches []T, activeName string, getMeta func(T) metav1.ObjectMeta, logger *logr.Logger) *T {
+	if len(matches) == 0 {
+		return nil
+	}
+	if len(matches) > 1 {
+		logger.Info("multiple configs match this node, resolving conflict", "count", len(matches))
+	}
+
+	// Keep the active config if it's still among matches.
+	if activeName != "" {
+		for i := range matches {
+			if getMeta(matches[i]).Name == activeName {
+				return &matches[i]
+			}
+		}
+	}
+
+	// No active or active no longer matches — pick oldest.
+	sort.Slice(matches, func(i, j int) bool {
+		ti := getMeta(matches[i]).CreationTimestamp.Time
+		tj := getMeta(matches[j]).CreationTimestamp.Time
+		if ti.Equal(tj) {
+			return getMeta(matches[i]).Name < getMeta(matches[j]).Name
+		}
+		return ti.Before(tj)
+	})
+	return &matches[0]
+}
+
+// nodeMatchesPowerProfile checks if a PowerProfile should be applied to a specific node.
+// Fetches the node to read its labels, then delegates to nodeMatchesSelector.
+// Short-circuits if the selector is empty (matches all nodes) to avoid unnecessary node fetch.
+func nodeMatchesPowerProfile(ctx context.Context, c client.Client, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
 	logger.V(5).Info("Checking if PowerProfile should be applied to node", "profile", profile.Name, "nodeName", nodeName)
-	// If no label selector is specified, apply to all nodes.
-	labelSelector := profile.Spec.NodeSelector.LabelSelector
-	if len(labelSelector.MatchLabels) == 0 && len(labelSelector.MatchExpressions) == 0 {
+
+	ls := profile.Spec.NodeSelector.LabelSelector
+	if len(ls.MatchLabels) == 0 && len(ls.MatchExpressions) == 0 {
 		logger.V(5).Info("No label selector specified, applying PowerProfile to all nodes", "profile", profile.Name, "nodeName", nodeName)
 		return true, nil
 	}
 
-	// Get the node to check its labels.
 	node := &corev1.Node{}
-	err := c.Get(context.TODO(), client.ObjectKey{Name: nodeName}, node)
-	if err != nil {
-		// If we can't get the node, don't apply the profile.
+	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		logger.Error(err, "Failed to get node for selector validation", "nodeName", nodeName)
 		return false, err
 	}
 
-	// Convert the label selector to a Selector and check if it matches the node.
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	match, err := nodeMatchesSelector(node.Labels, ls)
 	if err != nil {
-		logger.Error(err, "Failed to convert label selector", "selector", labelSelector)
+		logger.Error(err, "Failed to convert label selector", "selector", ls)
 		return false, err
 	}
-
-	// Check if the node's labels match the selector.
-	res := selector.Matches(labels.Set(node.Labels))
-	logger.V(5).Info("Node label check result", "nodeName", nodeName, "selector", selector, "nodeLabels", node.Labels, "result", res)
-	return res, nil
+	logger.V(5).Info("Node label check result", "nodeName", nodeName, "result", match)
+	return match, nil
 }
 
 // validateProfileAvailabilityOnNode validates that a PowerProfile exists in the cluster and is available to be used on the node
@@ -151,7 +198,7 @@ func validateProfileAvailabilityOnNode(ctx context.Context, c client.Client, pro
 	}
 
 	// Verify the node matches the PowerProfile node selector.
-	match, err := doesNodeMatchPowerProfileSelector(c, powerProfile, nodeName, logger)
+	match, err := nodeMatchesPowerProfile(ctx, c, powerProfile, nodeName, logger)
 	if err != nil {
 		logger.Error(err, "error checking if node matches power profile selector")
 		return false, err

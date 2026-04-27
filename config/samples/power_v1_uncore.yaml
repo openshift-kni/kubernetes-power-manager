@@ -7,9 +7,15 @@ metadata:
     app.kubernetes.io/part-of: kubernetes-power-manager
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: kubernetes-power-manager
-  name: <NODE_NAME>
+  name: uncore-sample
   namespace: power-manager
 spec:
+  # nodeSelector specifies which nodes this Uncore config applies to.
+  # If omitted, the config applies to all nodes running the Power Node Agent.
+  nodeSelector:
+    labelSelector:
+      matchLabels:
+        feature.node.kubernetes.io/cpu-model.vendor_id: Intel
   sysMax: 2300000
   sysMin: 1300000
   dieSelector:

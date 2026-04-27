@@ -41,6 +41,9 @@ import (
 const (
 	ExtendedResourcePrefix = "power.openshift.io/"
 	NodeAgentDSName        = "power-node-agent"
+
+	// FieldOwnerPowerConfigController is the SSA field manager for NodeInfo in PowerNodeState.
+	FieldOwnerPowerConfigController = "powerconfig-controller"
 )
 
 var NodeAgentDaemonSetPath = "/power-manifests/power-node-agent-ds.yaml"
@@ -206,6 +209,11 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 					logger.Error(err, "error creating the PowerNodeState CR")
 					return ctrl.Result{}, err
 				}
+
+				// Write NodeInfo via SSA once at creation time.
+				if err := r.applyNodeInfo(c, &node, powerNodeStateName, &logger); err != nil {
+					return ctrl.Result{}, err
+				}
 			} else {
 				return ctrl.Result{}, err
 			}
@@ -221,6 +229,41 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 	}
 
 	return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+}
+
+// applyNodeInfo writes static node information to PowerNodeState status via SSA.
+func (r *PowerConfigReconciler) applyNodeInfo(ctx context.Context, node *corev1.Node, powerNodeStateName string, logger *logr.Logger) error {
+	cpuCapacity := int(node.Status.Capacity.Cpu().Value())
+	arch := node.Labels[corev1.LabelArchStable]
+
+	patchNodeState := &powerv1.PowerNodeState{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "power.openshift.io/v1",
+			Kind:       "PowerNodeState",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      powerNodeStateName,
+			Namespace: PowerNamespace,
+		},
+		Status: powerv1.PowerNodeStateStatus{
+			NodeInfo: &powerv1.NodeInfo{
+				CPUCapacity:  cpuCapacity,
+				Architecture: arch,
+			},
+		},
+	}
+
+	if err := r.Status().Patch(ctx, patchNodeState, client.Apply,
+		client.FieldOwner(FieldOwnerPowerConfigController), client.ForceOwnership); err != nil {
+		logger.Error(err, "failed to apply NodeInfo to PowerNodeState", "powerNodeState", powerNodeStateName)
+		return err
+	}
+
+	logger.V(5).Info("applied NodeInfo to PowerNodeState",
+		"powerNodeState", powerNodeStateName,
+		"cpuCapacity", cpuCapacity,
+		"architecture", arch)
+	return nil
 }
 
 func (r *PowerConfigReconciler) createDaemonSetIfNotPresent(c context.Context, powerConfig *powerv1.PowerConfig, path string, logger *logr.Logger) error {

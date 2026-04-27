@@ -91,7 +91,7 @@ metadata:
               "app.kubernetes.io/name": "Uncore",
               "app.kubernetes.io/part-of": "kubernetes-power-manager"
             },
-            "name": "\u003cNODE_NAME\u003e",
+            "name": "uncore-sample",
             "namespace": "power-manager"
           },
           "spec": {
@@ -103,6 +103,13 @@ metadata:
                 "package": 0
               }
             ],
+            "nodeSelector": {
+              "labelSelector": {
+                "matchLabels": {
+                  "feature.node.kubernetes.io/cpu-model.vendor_id": "Intel"
+                }
+              }
+            },
             "sysMax": 2300000,
             "sysMin": 1300000
           }

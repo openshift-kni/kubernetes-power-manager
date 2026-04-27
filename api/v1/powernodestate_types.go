@@ -30,6 +30,13 @@ type PowerNodeStateSpec struct {
 // Non-SSA updates (Status().Update or MergePatch) will break field ownership
 // tracking and cause incorrect pruning behavior.
 type PowerNodeStateStatus struct {
+	// NodeInfo contains static node information written once by the PowerConfig controller.
+	// Acts as an SSA anchor: because this field is always present and owned, the status
+	// object is never empty.
+	// Owned by: PowerConfig controller
+	// +optional
+	NodeInfo *NodeInfo `json:"nodeInfo,omitempty"`
+
 	// PowerProfiles contains the status of power profiles on this node
 	// Owned by: PowerProfile controller
 	// +optional
@@ -46,6 +53,15 @@ type PowerNodeStateStatus struct {
 	// Owned by: Uncore controller
 	// +optional
 	Uncore *NodeUncoreStatus `json:"uncore,omitempty"`
+}
+
+// NodeInfo contains static information about the node, written once by the PowerConfig controller.
+type NodeInfo struct {
+	// CPUCapacity is the total number of CPUs on the node (from node.Status.Capacity)
+	CPUCapacity int `json:"cpuCapacity"`
+
+	// Architecture is the CPU architecture of the node (e.g., "amd64", "arm64")
+	Architecture string `json:"architecture"`
 }
 
 // PowerNodeProfileStatus represents the status of a power profile on this node

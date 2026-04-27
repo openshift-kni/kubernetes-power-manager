@@ -158,7 +158,7 @@ func (r *PowerProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Check if this profile should be applied to this node. The check applies to both shared and non-shared profiles.
-	match, err := doesNodeMatchPowerProfileSelector(r.Client, profile, nodeName, &logger)
+	match, err := nodeMatchesPowerProfile(ctx, r.Client, profile, nodeName, &logger)
 	if err != nil {
 		logger.Error(err, "error checking if node matches power profile selector")
 		return ctrl.Result{}, err

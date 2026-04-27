@@ -87,9 +87,9 @@ func testLogger() logr.Logger {
 	return ctrl.Log.WithName("test")
 }
 
-// --- selectPowerNodeConfig ---
+// --- selectActiveOrOldest (PowerNodeConfig) ---
 
-func TestSelectPowerNodeConfig(t *testing.T) {
+func TestSelectActiveOrOldest_PowerNodeConfig(t *testing.T) {
 	now := time.Now()
 	older := now.Add(-time.Hour)
 
@@ -153,7 +153,7 @@ func TestSelectPowerNodeConfig(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := testLogger()
-			result := selectPowerNodeConfig(tc.matches, tc.activeConfigName, &logger)
+			result := selectActiveOrOldest(tc.matches, tc.activeConfigName, powerNodeConfigMeta, &logger)
 			if tc.expectNil {
 				assert.Nil(t, result)
 			} else {
@@ -233,9 +233,9 @@ func TestGetMatchingPowerNodeConfigs(t *testing.T) {
 	}
 }
 
-// --- getActivePowerNodeConfigName ---
+// --- getActiveResourceName (PowerNodeConfig) ---
 
-func TestGetActivePowerNodeConfigName(t *testing.T) {
+func TestGetActiveResourceName_PowerNodeConfig(t *testing.T) {
 	tcases := []struct {
 		name         string
 		objs         []runtime.Object
@@ -264,7 +264,7 @@ func TestGetActivePowerNodeConfigName(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := createPowerNodeConfigReconciler(tc.objs, nil)
-			name, err := r.getActivePowerNodeConfigName(context.TODO(), "test-node")
+			name, err := getActiveResourceName(context.TODO(), r.Client, "test-node", powerNodeConfigActiveName)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {

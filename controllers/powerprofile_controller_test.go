@@ -2322,10 +2322,10 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, reconcile.Result{}, result)
 
-			// Verify doesNodeMatchPowerProfileSelector behavior
-			match, err := doesNodeMatchPowerProfileSelector(r.Client, profile, nodeName, &r.Log)
+			// Verify nodeMatchesPowerProfile behavior
+			match, err := nodeMatchesPowerProfile(context.TODO(), r.Client, profile, nodeName, &r.Log)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectMatch, match, "doesNodeMatchPowerProfileSelector result mismatch")
+			assert.Equal(t, tc.expectMatch, match, "nodeMatchesPowerProfile result mismatch")
 
 			// Verify extended resource creation/absence
 			updatedNode := &corev1.Node{}

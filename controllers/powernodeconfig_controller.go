@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -29,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,15 +78,17 @@ func (r *PowerNodeConfigReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	activeConfigName, err := r.getActivePowerNodeConfigName(ctx, nodeName)
+	activeConfigName, err := getActiveResourceName(ctx, r.Client, nodeName, powerNodeConfigActiveName)
 	if err != nil {
-		// PowerNodeState may not exist yet at startup (created by PowerConfig controller).
-		// Requeue instead of returning an error to avoid noisy error logs.
-		logger.Info("failed to get active config, requeueing", "reason", err.Error())
-		return ctrl.Result{RequeueAfter: queuetime}, nil
+		if errors.IsNotFound(err) {
+			// PowerNodeState may not exist yet at startup (created by PowerConfig controller).
+			logger.Info("PowerNodeState not found, requeueing")
+			return ctrl.Result{RequeueAfter: queuetime}, nil
+		}
+		return ctrl.Result{}, err
 	}
 
-	selected := selectPowerNodeConfig(matches, activeConfigName, &logger)
+	selected := selectActiveOrOldest(matches, activeConfigName, powerNodeConfigMeta, &logger)
 
 	// No matching config — clean up if something was active.
 	if selected == nil {
@@ -126,74 +126,23 @@ func (r *PowerNodeConfigReconciler) getMatchingPowerNodeConfigs(ctx context.Cont
 		return nil, fmt.Errorf("failed to list PowerNodeConfigs: %w", err)
 	}
 
-	var matches []powerv1.PowerNodeConfig
-	for _, config := range configList.Items {
-		ls := config.Spec.NodeSelector.LabelSelector
-		// Empty selector matches all nodes.
-		if len(ls.MatchLabels) == 0 && len(ls.MatchExpressions) == 0 {
-			matches = append(matches, config)
-			continue
-		}
-		selector, err := metav1.LabelSelectorAsSelector(&ls)
-		if err != nil {
-			r.Log.Error(err, "invalid label selector", "config", config.Name)
-			continue
-		}
-		if selector.Matches(labels.Set(node.Labels)) {
-			matches = append(matches, config)
-		}
-	}
-	return matches, nil
+	return filterByNodeSelector(configList.Items, node.Labels, powerNodeConfigSelector, powerNodeConfigMeta, r.Log), nil
 }
 
-// getActivePowerNodeConfigName reads the currently active config name from PowerNodeState status.
-func (r *PowerNodeConfigReconciler) getActivePowerNodeConfigName(ctx context.Context, nodeName string) (string, error) {
-	pns := &powerv1.PowerNodeState{}
-	pnsName := fmt.Sprintf("%s-power-state", nodeName)
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: PowerNamespace,
-		Name:      pnsName,
-	}, pns); err != nil {
-		if errors.IsNotFound(err) {
-			return "", fmt.Errorf("PowerNodeState %s not found, requeueing", pnsName)
-		}
-		return "", err
+// powerNodeConfigActiveName extracts the active PowerNodeConfig name from PowerNodeState status.
+func powerNodeConfigActiveName(s *powerv1.PowerNodeStateStatus) string {
+	if s.CPUPools != nil && s.CPUPools.Shared != nil {
+		return s.CPUPools.Shared.PowerNodeConfig
 	}
-	if pns.Status.CPUPools != nil && pns.Status.CPUPools.Shared != nil {
-		return pns.Status.CPUPools.Shared.PowerNodeConfig, nil
-	}
-	return "", nil
+	return ""
 }
 
-// selectPowerNodeConfig resolves which config to apply from the matching set.
-// If the active config is still among matches, it is kept. Otherwise, the oldest
-// config is selected (by creation timestamp, then name as tiebreaker).
-func selectPowerNodeConfig(matches []powerv1.PowerNodeConfig, activeConfigName string, logger *logr.Logger) *powerv1.PowerNodeConfig {
-	if len(matches) == 0 {
-		return nil
-	}
-	if len(matches) > 1 {
-		logger.Info("multiple PowerNodeConfigs match this node, resolving conflict", "count", len(matches))
-	}
+// powerNodeConfigMeta extracts ObjectMeta from a PowerNodeConfig for use with generic helpers.
+func powerNodeConfigMeta(c powerv1.PowerNodeConfig) metav1.ObjectMeta { return c.ObjectMeta }
 
-	// Keep the active config if it's still among matches.
-	if activeConfigName != "" {
-		for i := range matches {
-			if matches[i].Name == activeConfigName {
-				return &matches[i]
-			}
-		}
-	}
-
-	// No active or active no longer matches — pick oldest.
-	sort.Slice(matches, func(i, j int) bool {
-		ti, tj := matches[i].CreationTimestamp.Time, matches[j].CreationTimestamp.Time
-		if ti.Equal(tj) {
-			return matches[i].Name < matches[j].Name
-		}
-		return ti.Before(tj)
-	})
-	return &matches[0]
+// powerNodeConfigSelector extracts the LabelSelector from a PowerNodeConfig for use with filterByNodeSelector.
+func powerNodeConfigSelector(c powerv1.PowerNodeConfig) metav1.LabelSelector {
+	return c.Spec.NodeSelector.LabelSelector
 }
 
 // applyPowerNodeConfig validates profiles, configures shared and reserved CPU pools

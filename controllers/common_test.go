@@ -33,50 +33,57 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func Test_writeStatusErrors(t *testing.T) {
-	var object powerv1.PowerCRWithStatusErrors
-	var errorList error
-	var ctx = context.Background()
-	clientMockObj := mock.Mock{}
-	clientFuncs := interceptor.Funcs{
-		SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-			return clientMockObj.MethodCalled("SubResourcePatch", ctx, client, subResourceName, obj, opts).Error(0)
+func Test_nodeMatchesSelector(t *testing.T) {
+	tcases := []struct {
+		name      string
+		labels    map[string]string
+		selector  v1.LabelSelector
+		expected  bool
+		expectErr bool
+	}{
+		{
+			name:     "empty selector matches all",
+			labels:   map[string]string{"role": "worker"},
+			selector: v1.LabelSelector{},
+			expected: true,
+		},
+		{
+			name:     "matching labels",
+			labels:   map[string]string{"role": "worker", "arch": "x86"},
+			selector: v1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			expected: true,
+		},
+		{
+			name:     "non-matching labels",
+			labels:   map[string]string{"role": "worker"},
+			selector: v1.LabelSelector{MatchLabels: map[string]string{"role": "control-plane"}},
+			expected: false,
+		},
+		{
+			name:     "nil labels, empty selector",
+			labels:   nil,
+			selector: v1.LabelSelector{},
+			expected: true,
+		},
+		{
+			name:     "nil labels, non-empty selector",
+			labels:   nil,
+			selector: v1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			expected: false,
 		},
 	}
-	clientStatusWriter := fakeClient.NewClientBuilder().WithInterceptorFuncs(clientFuncs).Build().Status()
 
-	object = &powerv1.Uncore{}
-	assert.Nil(t, writeUpdatedStatusErrsIfRequired(ctx, nil, object, nil), "invalid object should return nil without doing anything")
-
-	object = &powerv1.Uncore{
-		ObjectMeta: v1.ObjectMeta{
-			UID: "not empty",
-		},
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := nodeMatchesSelector(tc.labels, tc.selector)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
 	}
-	clientMockObj.On("SubResourcePatch", ctx, mock.Anything, "status", &powerv1.Uncore{
-		ObjectMeta: v1.ObjectMeta{
-			UID: "not empty",
-		},
-		Status: powerv1.UncoreStatus{
-			StatusErrors: powerv1.StatusErrors{
-				Errors: []string{"err1"},
-			},
-		},
-	}, mock.Anything, mock.Anything).Return(nil)
-	errorList = fmt.Errorf("err1")
-	assert.Nil(t, writeUpdatedStatusErrsIfRequired(ctx, clientStatusWriter, object, errorList), "API should get updated with object with errors")
-
-	object = &powerv1.Uncore{
-		ObjectMeta: v1.ObjectMeta{
-			UID: "not empty",
-		},
-	}
-
-	clientMockObj = mock.Mock{}
-	updateErr := fmt.Errorf("update error")
-	clientMockObj.On("SubResourcePatch", ctx, mock.Anything, "status", mock.Anything, mock.Anything, mock.Anything).Return(updateErr)
-	assert.ErrorIs(t, writeUpdatedStatusErrsIfRequired(ctx, clientStatusWriter, object, fmt.Errorf("err2")), updateErr, "error updating APi should return that error")
-
 }
 
 func Test_addPowerNodeStatusProfileEntry(t *testing.T) {

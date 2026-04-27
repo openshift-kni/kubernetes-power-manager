@@ -17,21 +17,11 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 type StatusErrors struct {
 	Errors []string `json:"errors,omitempty"`
-}
-
-// +kubebuilder:object:generate=false
-type PowerCRWithStatusErrors interface {
-	metav1.Object
-	runtime.Object
-	SetStatusErrors(errs *[]string)
-	GetStatusErrors() *[]string
 }
 
 type GuaranteedPod struct {
