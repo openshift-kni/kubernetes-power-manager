@@ -172,14 +172,12 @@ func TestUncore_Reconcile_InvalidSpecs(t *testing.T) {
 	tcases := []struct {
 		name            string
 		spec            powerv1.UncoreSpec
-		errContains     string
-		skipStatusCheck bool
+		errContains string
 	}{
 		{
-			name:            "empty spec",
-			spec:            powerv1.UncoreSpec{},
-			errContains:     "no system wide or per die min/max values were provided",
-			skipStatusCheck: true,
+			name:        "empty spec",
+			spec:        powerv1.UncoreSpec{},
+			errContains: "no valid uncore configuration: requires either both sysMin and sysMax, or non-empty dieSelectors",
 		},
 		{
 			name:        "missing min in die selector",
@@ -251,13 +249,11 @@ func TestUncore_Reconcile_InvalidSpecs(t *testing.T) {
 			_, err := r.Reconcile(context.TODO(), req)
 			assert.ErrorContains(t, err, tc.errContains)
 
-			if !tc.skipStatusCheck {
-				// Verify error was recorded in PowerNodeState.
-				pns := &powerv1.PowerNodeState{}
-				assert.Nil(t, r.Get(context.TODO(), client.ObjectKey{Name: nodeName + "-power-state", Namespace: PowerNamespace}, pns))
-				assert.NotNil(t, pns.Status.Uncore)
-				assert.NotEmpty(t, pns.Status.Uncore.Errors)
-			}
+			// Verify error was recorded in PowerNodeState.
+			pns := &powerv1.PowerNodeState{}
+			assert.Nil(t, r.Get(context.TODO(), client.ObjectKey{Name: nodeName + "-power-state", Namespace: PowerNamespace}, pns))
+			assert.NotNil(t, pns.Status.Uncore)
+			assert.NotEmpty(t, pns.Status.Uncore.Errors)
 		})
 	}
 }

@@ -82,9 +82,6 @@ func getActiveResourceName(ctx context.Context, c client.Reader, nodeName string
 		Namespace: PowerNamespace,
 		Name:      pnsName,
 	}, pns); err != nil {
-		if errors.IsNotFound(err) {
-			return "", fmt.Errorf("PowerNodeState %s not found, requeueing", pnsName)
-		}
 		return "", err
 	}
 	return extractName(&pns.Status), nil
@@ -147,7 +144,7 @@ func selectActiveOrOldest[T any](matches []T, activeName string, getMeta func(T)
 // nodeMatchesPowerProfile checks if a PowerProfile should be applied to a specific node.
 // Fetches the node to read its labels, then delegates to nodeMatchesSelector.
 // Short-circuits if the selector is empty (matches all nodes) to avoid unnecessary node fetch.
-func nodeMatchesPowerProfile(c client.Client, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
+func nodeMatchesPowerProfile(ctx context.Context, c client.Client, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
 	logger.V(5).Info("Checking if PowerProfile should be applied to node", "profile", profile.Name, "nodeName", nodeName)
 
 	ls := profile.Spec.NodeSelector.LabelSelector
@@ -157,7 +154,7 @@ func nodeMatchesPowerProfile(c client.Client, profile *powerv1.PowerProfile, nod
 	}
 
 	node := &corev1.Node{}
-	if err := c.Get(context.TODO(), client.ObjectKey{Name: nodeName}, node); err != nil {
+	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		logger.Error(err, "Failed to get node for selector validation", "nodeName", nodeName)
 		return false, err
 	}
@@ -201,7 +198,7 @@ func validateProfileAvailabilityOnNode(ctx context.Context, c client.Client, pro
 	}
 
 	// Verify the node matches the PowerProfile node selector.
-	match, err := nodeMatchesPowerProfile(c, powerProfile, nodeName, logger)
+	match, err := nodeMatchesPowerProfile(ctx, c, powerProfile, nodeName, logger)
 	if err != nil {
 		logger.Error(err, "error checking if node matches power profile selector")
 		return false, err

@@ -80,10 +80,12 @@ func (r *PowerNodeConfigReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	activeConfigName, err := getActiveResourceName(ctx, r.Client, nodeName, powerNodeConfigActiveName)
 	if err != nil {
-		// PowerNodeState may not exist yet at startup (created by PowerConfig controller).
-		// Requeue instead of returning an error to avoid noisy error logs.
-		logger.Info("failed to get active config, requeueing", "reason", err.Error())
-		return ctrl.Result{RequeueAfter: queuetime}, nil
+		if errors.IsNotFound(err) {
+			// PowerNodeState may not exist yet at startup (created by PowerConfig controller).
+			logger.Info("PowerNodeState not found, requeueing")
+			return ctrl.Result{RequeueAfter: queuetime}, nil
+		}
+		return ctrl.Result{}, err
 	}
 
 	selected := selectActiveOrOldest(matches, activeConfigName, powerNodeConfigMeta, &logger)

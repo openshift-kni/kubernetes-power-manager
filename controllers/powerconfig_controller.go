@@ -209,14 +209,14 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 					logger.Error(err, "error creating the PowerNodeState CR")
 					return ctrl.Result{}, err
 				}
+
+				// Write NodeInfo via SSA once at creation time.
+				if err := r.applyNodeInfo(c, &node, powerNodeStateName, &logger); err != nil {
+					return ctrl.Result{}, err
+				}
 			} else {
 				return ctrl.Result{}, err
 			}
-		}
-
-		// Write NodeInfo via SSA.
-		if err := r.applyNodeInfo(c, &node, powerNodeStateName, &logger); err != nil {
-			return ctrl.Result{}, err
 		}
 	}
 

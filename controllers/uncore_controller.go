@@ -18,8 +18,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -75,6 +75,10 @@ func (r *UncoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("NODE_NAME environment variable not set")
 	}
 
+	if r.PowerLibrary.Topology() == nil {
+		return ctrl.Result{}, fmt.Errorf("power library topology not available")
+	}
+
 	// Get all Uncore CRs matching this node's labels.
 	matches, err := r.getMatchingUncores(ctx, nodeName)
 	if err != nil {
@@ -84,7 +88,11 @@ func (r *UncoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Read currently active uncore config from PowerNodeState.
 	activeUncoreName, err := getActiveResourceName(ctx, r.Client, nodeName, uncoreActiveName)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: queuetime}, nil
+		if errors.IsNotFound(err) {
+			// PowerNodeState may not exist yet at startup (created by PowerConfig controller).
+			return ctrl.Result{RequeueAfter: queuetime}, nil
+		}
+		return ctrl.Result{}, err
 	}
 
 	// Resolve which config to apply (if multiple match).
@@ -155,18 +163,26 @@ func (r *UncoreReconciler) applyUncoreConfig(
 ) (ctrl.Result, error) {
 	logger.Info("applying Uncore config", "config", uncore.Name)
 
+	spec := &uncore.Spec
+
+	// Validate spec before resetting.
+	hasSysWide := spec.SysMax != nil && spec.SysMin != nil
+	hasDieSelectors := spec.DieSelectors != nil && len(*spec.DieSelectors) > 0
+	if !hasSysWide && !hasDieSelectors {
+		validationErr := "no valid uncore configuration: requires either both sysMin and sysMax, or non-empty dieSelectors"
+		if err := r.updateUncoreInPowerNodeState(ctx, nodeName, uncore.Name, "", []string{validationErr}, logger); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, fmt.Errorf("%s", validationErr)
+	}
+
 	// Reset all uncore settings before applying new config.
 	if err := r.resetUncoreSettings(logger); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	spec := &uncore.Spec
 	var applyErrors []string
 	var configParts []string
-
-	if spec.SysMax == nil && spec.SysMin == nil && spec.DieSelectors == nil {
-		return ctrl.Result{}, fmt.Errorf("no system wide or per die min/max values were provided")
-	}
 
 	// Apply system-wide uncore settings.
 	if spec.SysMax != nil && spec.SysMin != nil {
@@ -247,12 +263,20 @@ func (r *UncoreReconciler) resetUncoreSettings(logger *logr.Logger) error {
 		logger.Error(err, "could not reset uncore for topology")
 		return err
 	}
-	for _, pkg := range *r.PowerLibrary.Topology().Packages() {
+	packages := r.PowerLibrary.Topology().Packages()
+	if packages == nil {
+		return nil
+	}
+	for _, pkg := range *packages {
 		if err := pkg.SetUncore(nil); err != nil {
 			logger.Error(err, "could not reset uncore on package")
 			return err
 		}
-		for _, die := range *pkg.Dies() {
+		dies := pkg.Dies()
+		if dies == nil {
+			continue
+		}
+		for _, die := range *dies {
 			if err := die.SetUncore(nil); err != nil {
 				logger.Error(err, "could not reset uncore on die")
 				return err
@@ -377,7 +401,7 @@ func (r *UncoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					oldNode := e.ObjectOld.(*corev1.Node)
 					newNode := e.ObjectNew.(*corev1.Node)
-					return !reflect.DeepEqual(oldNode.Labels, newNode.Labels)
+					return !maps.Equal(oldNode.Labels, newNode.Labels)
 				},
 			})).
 		Complete(r)
