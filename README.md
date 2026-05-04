@@ -1,7 +1,5 @@
 # Kubernetes Power Manager
 
-> **⚠️ Notice:** A disruptive enhancement for multi-node cluster support is currently in progress on the `main` branch. For a stable codebase, please use the [v0.0.1](https://github.com/cluster-power-manager/cluster-power-manager/tree/v0.0.1) release tag.
-
 This is an experimental project based on https://github.com/intel/kubernetes-power-manager (which has been
 discontinued). It also includes enhancements from https://github.com/AMDEPYC/kubernetes-power-manager
 (e.g. Dynamic CPU Frequency Management based on DPDK telemetry).
@@ -180,6 +178,34 @@ The Kubernetes Power Manager supports all of the above use cases.
 
   > Note: Make sure to use the same label in the `PowerConfig`, under `spec.powerNodeSelector`.
 
+- **cert-manager** (vanilla Kubernetes only) — Required for webhook TLS certificate provisioning. On OpenShift,
+  certificates are managed automatically by the service-ca operator. cert-manager must be installed and ready
+  before deploying the Cluster Power Manager.
+
+  Install cert-manager using kubectl:
+
+  ```console
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+  ```
+
+  Or using Helm (OCI registry):
+
+  ```console
+  helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --set crds.enabled=true
+  ```
+
+  Verify cert-manager is ready before proceeding:
+
+  ```console
+  kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s
+  ```
+
+  For more details, see the [official cert-manager installation guide](https://cert-manager.io/docs/installation/).
+  To uninstall, see the [cert-manager uninstall guide](https://cert-manager.io/docs/installation/uninstall/).
+
 - **Important**: In the kubelet configuration file the `cpuManagerPolicy` has to set to `static`, and the
   `reservedSystemCPUs` must be set to the desired value (full file [here](./examples/example-kubelet-configuration.yaml)):
 
@@ -192,39 +218,51 @@ The Kubernetes Power Manager supports all of the above use cases.
   ...
   ```
 
-## Deploying the Kubernetes Power Manager using kustomize
+## Building Images
 
-- Build the 2 images:
+The Cluster Power Manager requires two container images: the **Power Operator** (manager) and the **Power Node Agent**.
 
-  ```console
-  IMG_AGENT=quay.io/<user/org>/power-node-agent:latest IMG=quay.io/<user/org>/power-operator:latest IMGTOOL=<docker/podman> make update
+When building with custom image tags (different from the defaults), run `make update` first to update the image
+references in the deployment manifests. This ensures the operator deploys the node agent DaemonSet with the
+correct image.
 
-  OCP=true IMG_AGENT=quay.io/<user/org>/power-node-agent:latest IMG=quay.io/<user/org>/power-operator:latest IMGTOOL=<docker/podman> make images-ocp
-  ```
+```console
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+make update
 
-  > **Note**: By default, the images are built for x86_64 platforms. For an ARM platform, add the `PLATFORM=linux/arm64` parameter:
-  >
-  > ```console
-  > OCP=true IMG_AGENT=<...> IMG=<...> PLATFORM=linux/arm64 IMGTOOL=<...> make images-ocp
-  > ```
+# OpenShift
+OCP=true \
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+make update
+```
 
-- Push the 2 images:
+### Building Single-Architecture Images
 
-  ```console
-  <docker/podman> push <image>
-  ```
+Build both images for a single platform. `IMGTOOL` defaults to `docker` and `PLATFORM` defaults to `linux/amd64`.
 
-- Install the CRDs and deploy the operator:
+```console
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+IMGTOOL=<docker|podman> \
+PLATFORM=<linux/amd64|linux/arm64> \
+make build-push-images
 
-  ```console
-  OCP=true IMG_AGENT=quay.io/<user/org>/power-node-agent:latest IMG=quay.io/<user/org>/power-operator:latest make install deploy
-  ```
+# For OpenShift (uses UBI base image and OCP-specific manifests):
+OCP=true \
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+IMGTOOL=<docker|podman> \
+PLATFORM=<linux/amd64|linux/arm64> \
+make build-push-images-ocp
+```
 
-## Building Multi-Architecture Images
+### Building Multi-Architecture Images
 
 The Kubernetes Power Manager supports building multi-architecture container images for both the Power Operator and Power Node Agent. This allows you to create a single image tag that works across multiple architectures (e.g., AMD64 and ARM64).
 
-### Prerequisites
+#### Prerequisites
 
 **For Podman:**
 
@@ -257,7 +295,7 @@ docker buildx create --name multiarch --use
 docker buildx inspect --bootstrap
 ```
 
-### Build Multi-Arch Images
+#### Build Multi-Arch Images
 
 Build both operator and agent images for multiple architectures (default: linux/amd64 and linux/arm64):
 
@@ -285,7 +323,7 @@ VERSION=latest \
 make build-push-multiarch
 ```
 
-### Customizing Target Platforms
+#### Customizing Target Platforms
 
 Override the default platforms (linux/amd64,linux/arm64):
 
@@ -297,7 +335,7 @@ VERSION=latest \
 make build-push-multiarch
 ```
 
-### Verifying Multi-Arch Images
+#### Verifying Multi-Arch Images
 
 After pushing, verify the multi-arch manifest:
 
@@ -307,6 +345,25 @@ podman manifest inspect quay.io/<user/org>/kubernetes-power-manager-operator:lat
 
 # Using Docker
 docker buildx imagetools inspect quay.io/<user/org>/kubernetes-power-manager-operator:latest
+```
+
+## Deploying the Cluster Power Manager using kustomize
+
+Install the CRDs and deploy the operator:
+
+```console
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+make install deploy
+```
+
+For OpenShift:
+
+```console
+OCP=true \
+IMG=quay.io/<user/org>/power-operator:<tag> \
+IMG_AGENT=quay.io/<user/org>/power-node-agent:<tag> \
+make install deploy
 ```
 
 ## Deploying the Kubernetes Power Manager using Helm

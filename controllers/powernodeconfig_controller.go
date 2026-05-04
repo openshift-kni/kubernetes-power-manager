@@ -56,7 +56,6 @@ type PowerNodeConfigReconciler struct {
 // +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=list;watch
-// +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 // Reconcile evaluates all PowerNodeConfigs matching this node, resolves conflicts,
 // and configures or cleans up shared and reserved CPU pools accordingly.

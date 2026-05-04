@@ -60,4 +60,4 @@ spec:
         - name: pods
           hostPath:
             path: /var/lib/power-node-agent/pods
-            type: DirectoryOrCreat
+            type: DirectoryOrCreate
