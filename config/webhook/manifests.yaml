@@ -10,14 +10,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-power-openshift-io-v1-powernodeconfig
+      path: /validate-power-cluster-power-manager-github-io-v1alpha1-powernodeconfig
   failurePolicy: Fail
   name: vpowernodeconfig.kb.io
   rules:
   - apiGroups:
-    - power.openshift.io
+    - power.cluster-power-manager.github.io
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
@@ -30,14 +30,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-power-openshift-io-v1-powerprofile
+      path: /validate-power-cluster-power-manager-github-io-v1alpha1-powerprofile
   failurePolicy: Fail
   name: vpowerprofile.kb.io
   rules:
   - apiGroups:
-    - power.openshift.io
+    - power.cluster-power-manager.github.io
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
@@ -51,14 +51,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-power-openshift-io-v1-uncore
+      path: /validate-power-cluster-power-manager-github-io-v1alpha1-uncore
   failurePolicy: Fail
   name: vuncore.kb.io
   rules:
   - apiGroups:
-    - power.openshift.io
+    - power.cluster-power-manager.github.io
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE

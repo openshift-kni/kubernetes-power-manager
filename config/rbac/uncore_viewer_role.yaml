@@ -12,7 +12,7 @@ metadata:
   name: uncore-viewer-role
 rules:
   - apiGroups:
-      - power.openshift.io
+      - power.cluster-power-manager.github.io
     resources:
       - uncores
     verbs:
@@ -20,7 +20,7 @@ rules:
       - list
       - watch
   - apiGroups:
-      - power.openshift.io
+      - power.cluster-power-manager.github.io
     resources:
       - uncores/status
     verbs:

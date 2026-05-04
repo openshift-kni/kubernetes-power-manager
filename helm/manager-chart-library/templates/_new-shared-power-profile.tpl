@@ -1,5 +1,5 @@
 {{- define "manager-chart-library.new-shared-profile" -}}
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerProfile
 metadata:
   name: {{ .Values.sharedprofile.name }}

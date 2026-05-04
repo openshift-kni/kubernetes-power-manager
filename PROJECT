@@ -1,4 +1,4 @@
-domain: openshift.io
+domain: cluster-power-manager.github.io
 layout:
 - go.kubebuilder.io/v4
 plugins:
@@ -7,29 +7,29 @@ plugins:
 projectName: kubernetes-power-manager
 repo: github.com/openshift-kni/kubernetes-power-manager
 resources:
-- domain: openshift.io
+- domain: cluster-power-manager.github.io
   group: power
   kind: PowerProfile
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1
-  version: v1
-- domain: openshift.io
+  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  version: v1alpha1
+- domain: cluster-power-manager.github.io
   group: power
   kind: PowerConfig
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1
-  version: v1
-- domain: openshift.io
+  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  version: v1alpha1
+- domain: cluster-power-manager.github.io
   group: power
   kind: PowerNodeState
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1
-  version: v1
-- domain: openshift.io
+  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  version: v1alpha1
+- domain: cluster-power-manager.github.io
   group: power
   kind: PowerNodeConfig
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1
-  version: v1
-- domain: openshift.io
+  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  version: v1alpha1
+- domain: cluster-power-manager.github.io
   group: power
   kind: Uncore
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1
-  version: v1
+  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  version: v1alpha1
 version: "3"

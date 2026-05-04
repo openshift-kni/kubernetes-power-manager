@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/podresourcesclient"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/podstate"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +46,7 @@ func createPodReconcilerWithEnvTest(
 	t.Helper()
 
 	s := scheme.Scheme
-	_ = powerv1.AddToScheme(s)
+	_ = powerv1alpha1.AddToScheme(s)
 
 	state, err := podstate.NewState()
 	require.NoError(t, err)
@@ -94,9 +94,9 @@ func createPodReconcilePrereqs(t *testing.T, cl client.Client, ctx context.Conte
 	}))
 	createTestPowerNodeState(t, cl, fmt.Sprintf("%s-power-state", nodeName))
 	for _, name := range profileNames {
-		require.NoError(t, cl.Create(ctx, &powerv1.PowerProfile{
+		require.NoError(t, cl.Create(ctx, &powerv1alpha1.PowerProfile{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: PowerNamespace},
-			Spec:       powerv1.PowerProfileSpec{},
+			Spec:       powerv1alpha1.PowerProfileSpec{},
 		}))
 	}
 }
@@ -125,12 +125,12 @@ func TestSSA_PodReconcile_SinglePod(t *testing.T) {
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 					},
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 					},
 				},
 			}},
@@ -170,7 +170,7 @@ func TestSSA_PodReconcile_SinglePod(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify PowerNodeState has the pod's exclusive entry via real SSA.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace,
 	}, pns))
@@ -219,12 +219,12 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 							corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-							corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+							corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 							corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-							corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+							corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 						},
 					},
 				},
@@ -234,12 +234,12 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 							corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-							corev1.ResourceName("power.openshift.io/balance-performance"): *resource.NewQuantity(2, resource.DecimalSI),
+							corev1.ResourceName("power.cluster-power-manager.github.io/balance-performance"): *resource.NewQuantity(2, resource.DecimalSI),
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 							corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-							corev1.ResourceName("power.openshift.io/balance-performance"): *resource.NewQuantity(2, resource.DecimalSI),
+							corev1.ResourceName("power.cluster-power-manager.github.io/balance-performance"): *resource.NewQuantity(2, resource.DecimalSI),
 						},
 					},
 				},
@@ -269,12 +269,12 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 					},
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(2, resource.DecimalSI),
 					},
 				},
 			}},
@@ -326,7 +326,7 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify both pods coexist in PowerNodeState via real SSA merge.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace,
 	}, pns))
@@ -335,7 +335,7 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 	require.Len(t, pns.Status.CPUPools.Exclusive, 2, "both pods should be present via correct SSA merge")
 
 	// Collect entries by podUID for stable assertions.
-	podEntries := map[string]powerv1.ExclusiveCPUPoolStatus{}
+	podEntries := map[string]powerv1alpha1.ExclusiveCPUPoolStatus{}
 	for _, entry := range pns.Status.CPUPools.Exclusive {
 		podEntries[entry.PodUID] = entry
 	}
@@ -344,7 +344,7 @@ func TestSSA_PodReconcile_TwoPodsMerge(t *testing.T) {
 	pod1 := podEntries[uid1]
 	assert.Equal(t, "pod-1", pod1.Pod)
 	require.Len(t, pod1.PowerContainers, 2)
-	containersByName := map[string]powerv1.PowerContainer{}
+	containersByName := map[string]powerv1alpha1.PowerContainer{}
 	for _, pc := range pod1.PowerContainers {
 		containersByName[pc.Name] = pc
 	}
@@ -394,12 +394,12 @@ func TestSSA_PodReconcile_NoDuplicateContainers(t *testing.T) {
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(3, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(3, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(3, resource.DecimalSI),
 					},
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(3, resource.DecimalSI),
 						corev1.ResourceMemory: *resource.NewQuantity(128, resource.DecimalSI),
-						corev1.ResourceName("power.openshift.io/performance"): *resource.NewQuantity(3, resource.DecimalSI),
+						corev1.ResourceName("power.cluster-power-manager.github.io/performance"): *resource.NewQuantity(3, resource.DecimalSI),
 					},
 				},
 			}},
@@ -437,7 +437,7 @@ func TestSSA_PodReconcile_NoDuplicateContainers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify PowerNodeState has exactly one entry with one container — no duplicates.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace,
 	}, pns))
@@ -467,20 +467,20 @@ func TestSSA_ExclusivePoolFieldManagerOwnership(t *testing.T) {
 
 	// Add pod 1.
 	err := r.addPowerNodeStatusExclusiveEntry(ctx, nodeName, "uid-1", "pod-1",
-		[]powerv1.PowerContainer{
+		[]powerv1alpha1.PowerContainer{
 			{Name: "c1", ID: "cid-1", PowerProfile: "performance", CPUIDs: []uint{1, 2}},
 		}, &logger)
 	require.NoError(t, err)
 
 	// Add pod 2.
 	err = r.addPowerNodeStatusExclusiveEntry(ctx, nodeName, "uid-2", "pod-2",
-		[]powerv1.PowerContainer{
+		[]powerv1alpha1.PowerContainer{
 			{Name: "c2", ID: "cid-2", PowerProfile: "balance-power", CPUIDs: []uint{3, 4}},
 		}, &logger)
 	require.NoError(t, err)
 
 	// Both pods should coexist.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 
@@ -502,13 +502,13 @@ func TestSSA_ExclusivePoolPodRemovalPreservesOtherPods(t *testing.T) {
 
 	// Add two pods.
 	err := r.addPowerNodeStatusExclusiveEntry(ctx, nodeName, "uid-1", "pod-1",
-		[]powerv1.PowerContainer{
+		[]powerv1alpha1.PowerContainer{
 			{Name: "c1", ID: "cid-1", PowerProfile: "performance", CPUIDs: []uint{1, 2}},
 		}, &logger)
 	require.NoError(t, err)
 
 	err = r.addPowerNodeStatusExclusiveEntry(ctx, nodeName, "uid-2", "pod-2",
-		[]powerv1.PowerContainer{
+		[]powerv1alpha1.PowerContainer{
 			{Name: "c2", ID: "cid-2", PowerProfile: "performance", CPUIDs: []uint{3, 4}},
 		}, &logger)
 	require.NoError(t, err)
@@ -518,7 +518,7 @@ func TestSSA_ExclusivePoolPodRemovalPreservesOtherPods(t *testing.T) {
 	require.NoError(t, err)
 
 	// Only pod 2 should remain.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 

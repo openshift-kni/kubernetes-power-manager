@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	ExtendedResourcePrefix = "power.openshift.io/"
+	ExtendedResourcePrefix = "power.cluster-power-manager.github.io/"
 	NodeAgentDSName        = "power-node-agent"
 
 	// FieldOwnerPowerConfigController is the SSA field manager for NodeInfo in PowerNodeState.
@@ -56,10 +56,10 @@ type PowerConfigReconciler struct {
 	State  *state.PowerNodeData
 }
 
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powerconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -72,7 +72,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	configs := &powerv1.PowerConfigList{}
+	configs := &powerv1alpha1.PowerConfigList{}
 	logger.V(5).Info("retrieving the power config list")
 	err := r.Client.List(c, configs)
 	if err != nil {
@@ -80,7 +80,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	config := &powerv1.PowerConfig{}
+	config := &powerv1alpha1.PowerConfig{}
 	logger.V(5).Info("retrieving the power config")
 	err = r.Client.Get(c, req.NamespacedName, config)
 	if err != nil {
@@ -88,7 +88,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 		if errors.IsNotFound(err) {
 			// Power config was deleted, if the number of power configs is > 0, don't delete the power profiles
 			if len(configs.Items) == 0 {
-				powerProfiles := &powerv1.PowerProfileList{}
+				powerProfiles := &powerv1alpha1.PowerProfileList{}
 				err = r.Client.List(c, powerProfiles)
 				logger.V(5).Info("retrieving all power profiles in the cluster")
 				if err != nil {
@@ -106,7 +106,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 				}
 
 				// Delete all the PowerNodeStates CRs.
-				powerNodeStates := &powerv1.PowerNodeStateList{}
+				powerNodeStates := &powerv1alpha1.PowerNodeStateList{}
 				err = r.Client.List(c, powerNodeStates)
 				logger.V(5).Info("retrieving all PowerNodeStates in the cluster")
 				if err != nil {
@@ -187,7 +187,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 		r.State.UpdatePowerNodeData(node.Name)
 
 		// Create PowerNodeState for this node if it doesn't exist
-		powerNodeState := &powerv1.PowerNodeState{}
+		powerNodeState := &powerv1alpha1.PowerNodeState{}
 		powerNodeStateName := fmt.Sprintf("%s-power-state", node.Name)
 		err = r.Client.Get(c, client.ObjectKey{
 			Namespace: PowerNamespace,
@@ -197,7 +197,7 @@ func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.V(5).Info(fmt.Sprintf("creating the PowerNodeState CR %s", powerNodeStateName))
-				powerNodeState = &powerv1.PowerNodeState{
+				powerNodeState = &powerv1alpha1.PowerNodeState{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: PowerNamespace,
 						Name:      powerNodeStateName,
@@ -236,17 +236,17 @@ func (r *PowerConfigReconciler) applyNodeInfo(ctx context.Context, node *corev1.
 	cpuCapacity := int(node.Status.Capacity.Cpu().Value())
 	arch := node.Labels[corev1.LabelArchStable]
 
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
-			NodeInfo: &powerv1.NodeInfo{
+		Status: powerv1alpha1.PowerNodeStateStatus{
+			NodeInfo: &powerv1alpha1.NodeInfo{
 				CPUCapacity:  cpuCapacity,
 				Architecture: arch,
 			},
@@ -266,7 +266,7 @@ func (r *PowerConfigReconciler) applyNodeInfo(ctx context.Context, node *corev1.
 	return nil
 }
 
-func (r *PowerConfigReconciler) createDaemonSetIfNotPresent(c context.Context, powerConfig *powerv1.PowerConfig, path string, logger *logr.Logger) error {
+func (r *PowerConfigReconciler) createDaemonSetIfNotPresent(c context.Context, powerConfig *powerv1alpha1.PowerConfig, path string, logger *logr.Logger) error {
 	logger.V(5).Info("creating the daemonSet")
 
 	daemonSet := &appsv1.DaemonSet{}
@@ -328,6 +328,6 @@ func createDaemonSetFromManifest(path string) (*appsv1.DaemonSet, error) {
 
 func (r *PowerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&powerv1.PowerConfig{}).
+		For(&powerv1alpha1.PowerConfig{}).
 		Complete(r)
 }

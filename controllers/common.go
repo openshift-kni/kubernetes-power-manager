@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -75,8 +75,8 @@ func nodeMatchesSelector(nodeLabels map[string]string, ls metav1.LabelSelector) 
 // getActiveResourceName reads the currently active resource name from PowerNodeState status.
 // extractName extracts the active resource name from the PowerNodeState status — each controller
 // reads from a different status field (e.g., Uncore.Name vs CPUPools.Shared.PowerNodeConfig).
-func getActiveResourceName(ctx context.Context, c client.Reader, nodeName string, extractName func(*powerv1.PowerNodeStateStatus) string) (string, error) {
-	pns := &powerv1.PowerNodeState{}
+func getActiveResourceName(ctx context.Context, c client.Reader, nodeName string, extractName func(*powerv1alpha1.PowerNodeStateStatus) string) (string, error) {
+	pns := &powerv1alpha1.PowerNodeState{}
 	pnsName := fmt.Sprintf("%s-power-state", nodeName)
 	if err := c.Get(ctx, client.ObjectKey{
 		Namespace: PowerNamespace,
@@ -144,7 +144,7 @@ func selectActiveOrOldest[T any](matches []T, activeName string, getMeta func(T)
 // nodeMatchesPowerProfile checks if a PowerProfile should be applied to a specific node.
 // Fetches the node to read its labels, then delegates to nodeMatchesSelector.
 // Short-circuits if the selector is empty (matches all nodes) to avoid unnecessary node fetch.
-func nodeMatchesPowerProfile(ctx context.Context, c client.Client, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
+func nodeMatchesPowerProfile(ctx context.Context, c client.Client, profile *powerv1alpha1.PowerProfile, nodeName string, logger *logr.Logger) (bool, error) {
 	logger.V(5).Info("Checking if PowerProfile should be applied to node", "profile", profile.Name, "nodeName", nodeName)
 
 	ls := profile.Spec.NodeSelector.LabelSelector
@@ -174,7 +174,7 @@ func validateProfileAvailabilityOnNode(ctx context.Context, c client.Client, pro
 		return true, nil
 	}
 
-	powerProfile := &powerv1.PowerProfile{}
+	powerProfile := &powerv1alpha1.PowerProfile{}
 	err := c.Get(ctx, client.ObjectKey{
 		Name:      profileName,
 		Namespace: PowerNamespace,
@@ -221,8 +221,8 @@ func formatIntOrString(value *intstr.IntOrString) string {
 
 // formatCpuScalingPolicy serializes a CpuScalingPolicy to its JSON representation.
 // Returns empty string if policy is nil. Nil fields within the policy are omitted.
-func formatCpuScalingPolicy(policy *powerv1.CpuScalingPolicy) (string, error) {
-	if policy == nil || *policy == (powerv1.CpuScalingPolicy{}) {
+func formatCpuScalingPolicy(policy *powerv1alpha1.CpuScalingPolicy) (string, error) {
+	if policy == nil || *policy == (powerv1alpha1.CpuScalingPolicy{}) {
 		return "", nil
 	}
 	b, err := json.Marshal(policy)
@@ -236,17 +236,17 @@ func formatCpuScalingPolicy(policy *powerv1.CpuScalingPolicy) (string, error) {
 // using Server-Side Apply. The fieldManager parameter enables per-profile ownership — each profile
 // should use a unique field manager (e.g., "powerprofile-controller.profile-name") so that SSA can
 // track ownership at the element level for the map-type PowerProfiles list.
-func applyPowerNodeStateProfilesStatus(ctx context.Context, c client.Client, powerNodeStateName string, profiles []powerv1.PowerNodeProfileStatus, fieldManager string) error {
-	patchNodeState := &powerv1.PowerNodeState{
+func applyPowerNodeStateProfilesStatus(ctx context.Context, c client.Client, powerNodeStateName string, profiles []powerv1alpha1.PowerNodeProfileStatus, fieldManager string) error {
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
 			PowerProfiles: profiles,
 		},
 	}
@@ -260,7 +260,7 @@ func applyPowerNodeStateProfilesStatus(ctx context.Context, c client.Client, pow
 // This function uses per-profile field managers (e.g., "powerprofile-controller.profile-name") to enable
 // concurrent updates from different profile controllers. Since PowerProfiles is a map-type list keyed by
 // name, SSA merges entries by key - each controller only owns its own profile entry.
-func addPowerNodeStatusProfileEntry(ctx context.Context, c client.Client, nodeName string, profile *powerv1.PowerProfile, profileErrors error, logger *logr.Logger) error {
+func addPowerNodeStatusProfileEntry(ctx context.Context, c client.Client, nodeName string, profile *powerv1alpha1.PowerProfile, profileErrors error, logger *logr.Logger) error {
 	if nodeName == "" {
 		return fmt.Errorf("nodeName cannot be empty")
 	}
@@ -286,10 +286,10 @@ func addPowerNodeStatusProfileEntry(ctx context.Context, c client.Client, nodeNa
 	}
 
 	errList := util.UnpackErrsToStrings(profileErrors)
-	profileStatus := powerv1.PowerNodeProfileStatus{Name: profile.Name, Config: config, Errors: *errList}
+	profileStatus := powerv1alpha1.PowerNodeProfileStatus{Name: profile.Name, Config: config, Errors: *errList}
 	fieldManager := powerProfileFieldManager(profile.Name)
 
-	err = applyPowerNodeStateProfilesStatus(ctx, c, powerNodeStateName, []powerv1.PowerNodeProfileStatus{profileStatus}, fieldManager)
+	err = applyPowerNodeStateProfilesStatus(ctx, c, powerNodeStateName, []powerv1alpha1.PowerNodeProfileStatus{profileStatus}, fieldManager)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Profile was already created, but status wasn't recorded.
@@ -321,7 +321,7 @@ func removePowerNodeStatusProfileEntry(ctx context.Context, c client.Client, nod
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 	fieldManager := powerProfileFieldManager(profileName)
 
-	if err := applyPowerNodeStateProfilesStatus(ctx, c, powerNodeStateName, []powerv1.PowerNodeProfileStatus{}, fieldManager); err != nil {
+	if err := applyPowerNodeStateProfilesStatus(ctx, c, powerNodeStateName, []powerv1alpha1.PowerNodeProfileStatus{}, fieldManager); err != nil {
 		if errors.IsNotFound(err) {
 			logger.V(5).Info("PowerNodeState not found, nothing to remove", "powerNodeState", powerNodeStateName)
 			return nil

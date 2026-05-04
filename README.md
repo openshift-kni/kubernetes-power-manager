@@ -382,7 +382,7 @@ PowerConfigs created after the first.
 **Example:**
 
 ```yaml
-apiVersion: "power.openshift.io/v1"
+apiVersion: "power.cluster-power-manager.github.io/v1alpha1"
 kind: PowerConfig
 metadata:
   name: power-config
@@ -411,7 +411,7 @@ If specified, the `reservedCPUs` values should correspond to the `reservedSystem
 **Example:**
 
 ```yaml
-apiVersion: "power.openshift.io/v1"
+apiVersion: "power.cluster-power-manager.github.io/v1alpha1"
 kind: PowerNodeConfig
 metadata:
   name: shared-example-config
@@ -440,7 +440,7 @@ PodSpec. All `PowerProfiles` must be created explicitly by the user.
 **Example:**
 
 ```yaml
-apiVersion: "power.openshift.io/v1"
+apiVersion: "power.cluster-power-manager.github.io/v1alpha1"
 kind: PowerProfile
 metadata:
   name: performance-example-application
@@ -483,7 +483,7 @@ The same shared `PowerProfile` can be referenced by multiple `PowerNodeConfig` C
 **Examples:**
 
 ```yaml
-apiVersion: "power.openshift.io/v1"
+apiVersion: "power.cluster-power-manager.github.io/v1alpha1"
 kind: PowerProfile
 metadata:
   name: shared-example-node1
@@ -497,7 +497,7 @@ spec:
 ```
 
 ```yaml
-apiVersion: "power.openshift.io/v1"
+apiVersion: "power.cluster-power-manager.github.io/v1alpha1"
 kind: PowerProfile
 metadata:
   name: shared-example-node2
@@ -538,7 +538,7 @@ controllers, each owning their respective fields.
 **Example:**
 
 ```yaml
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerNodeState
 metadata:
   name: example-node-power-state
@@ -605,7 +605,7 @@ Currently the Kubernetes Power Manager supports multiple `PowerProfile` per Pod,
 If any error occurs it will be displayed in the status field of the custom resource, for example:
 
 ```yaml
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerProfile
   ...
 status:
@@ -616,7 +616,7 @@ status:
 If no errors occurred or were corrected, the list will be empty
 
 ```yaml
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerProfile
   ...
 status:

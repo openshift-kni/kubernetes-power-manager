@@ -1,7 +1,7 @@
 # PowerProfile for x86_64 with cpuScalingPolicy
 # This example demonstrates how to deploy a PowerProfile with a cpuScalingPolicy.
 # This PowerProfile will be applied to all nodes that match the NodeSelector and it can take up to 40 of the CPUs.
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerProfile
 metadata:
  name: application-dpdk

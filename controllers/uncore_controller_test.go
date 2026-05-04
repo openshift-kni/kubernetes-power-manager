@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zapcore"
@@ -31,8 +31,8 @@ func createUncoreReconciler(objs []runtime.Object, powerLib power.Host) *UncoreR
 		func(opts *zap.Options) { opts.TimeEncoder = zapcore.ISO8601TimeEncoder },
 	))
 	s := scheme.Scheme
-	_ = powerv1.AddToScheme(s)
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).WithScheme(s).WithStatusSubresource(&powerv1.PowerNodeState{}).Build()
+	_ = powerv1alpha1.AddToScheme(s)
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).WithScheme(s).WithStatusSubresource(&powerv1alpha1.PowerNodeState{}).Build()
 	return &UncoreReconciler{
 		Client:       cl,
 		Log:          ctrl.Log.WithName("testing"),
@@ -42,8 +42,8 @@ func createUncoreReconciler(objs []runtime.Object, powerLib power.Host) *UncoreR
 }
 
 // newUncore creates an Uncore CR for testing.
-func newUncore(name string, spec powerv1.UncoreSpec, nodeSelectorMatchLabels map[string]string, creationTime time.Time) *powerv1.Uncore {
-	u := &powerv1.Uncore{
+func newUncore(name string, spec powerv1alpha1.UncoreSpec, nodeSelectorMatchLabels map[string]string, creationTime time.Time) *powerv1alpha1.Uncore {
+	u := &powerv1alpha1.Uncore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         PowerNamespace,
@@ -52,7 +52,7 @@ func newUncore(name string, spec powerv1.UncoreSpec, nodeSelectorMatchLabels map
 		Spec: spec,
 	}
 	if nodeSelectorMatchLabels != nil {
-		u.Spec.NodeSelector = powerv1.NodeSelector{
+		u.Spec.NodeSelector = powerv1alpha1.NodeSelector{
 			LabelSelector: metav1.LabelSelector{MatchLabels: nodeSelectorMatchLabels},
 		}
 	}
@@ -60,13 +60,13 @@ func newUncore(name string, spec powerv1.UncoreSpec, nodeSelectorMatchLabels map
 }
 
 // newUncorePowerNodeState creates a PowerNodeState with optional uncore status.
-func newUncorePowerNodeState(nodeName, activeUncore string) *powerv1.PowerNodeState {
-	pns := &powerv1.PowerNodeState{
+func newUncorePowerNodeState(nodeName, activeUncore string) *powerv1alpha1.PowerNodeState {
+	pns := &powerv1alpha1.PowerNodeState{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeName + "-power-state", Namespace: PowerNamespace},
 	}
 	if activeUncore != "" {
-		pns.Status = powerv1.PowerNodeStateStatus{
-			Uncore: &powerv1.NodeUncoreStatus{
+		pns.Status = powerv1alpha1.PowerNodeStateStatus{
+			Uncore: &powerv1alpha1.NodeUncoreStatus{
 				Name:   activeUncore,
 				Config: "SysMin: 1200000, SysMax: 2400000",
 			},
@@ -82,11 +82,11 @@ func TestSelectActiveOrOldest_Uncore(t *testing.T) {
 	older := now.Add(-time.Hour)
 	sysMax := uint(2400000)
 	sysMin := uint(1200000)
-	spec := powerv1.UncoreSpec{SysMax: &sysMax, SysMin: &sysMin}
+	spec := powerv1alpha1.UncoreSpec{SysMax: &sysMax, SysMin: &sysMin}
 
 	tcases := []struct {
 		name             string
-		matches          []powerv1.Uncore
+		matches          []powerv1alpha1.Uncore
 		activeUncoreName string
 		expectedName     string
 		expectNil        bool
@@ -98,24 +98,24 @@ func TestSelectActiveOrOldest_Uncore(t *testing.T) {
 		},
 		{
 			name:         "single match, no active",
-			matches:      []powerv1.Uncore{*newUncore("uncore-a", spec, nil, now)},
+			matches:      []powerv1alpha1.Uncore{*newUncore("uncore-a", spec, nil, now)},
 			expectedName: "uncore-a",
 		},
 		{
 			name:             "single match, is active",
-			matches:          []powerv1.Uncore{*newUncore("uncore-a", spec, nil, now)},
+			matches:          []powerv1alpha1.Uncore{*newUncore("uncore-a", spec, nil, now)},
 			activeUncoreName: "uncore-a",
 			expectedName:     "uncore-a",
 		},
 		{
 			name:             "single match, different active",
-			matches:          []powerv1.Uncore{*newUncore("uncore-a", spec, nil, now)},
+			matches:          []powerv1alpha1.Uncore{*newUncore("uncore-a", spec, nil, now)},
 			activeUncoreName: "uncore-b",
 			expectedName:     "uncore-a",
 		},
 		{
 			name: "two matches, active still matches — sticky",
-			matches: []powerv1.Uncore{
+			matches: []powerv1alpha1.Uncore{
 				*newUncore("uncore-a", spec, nil, older),
 				*newUncore("uncore-b", spec, nil, now),
 			},
@@ -124,7 +124,7 @@ func TestSelectActiveOrOldest_Uncore(t *testing.T) {
 		},
 		{
 			name: "two matches, active gone — oldest wins",
-			matches: []powerv1.Uncore{
+			matches: []powerv1alpha1.Uncore{
 				*newUncore("uncore-b", spec, nil, now),
 				*newUncore("uncore-a", spec, nil, older),
 			},
@@ -133,7 +133,7 @@ func TestSelectActiveOrOldest_Uncore(t *testing.T) {
 		},
 		{
 			name: "two matches same time — name tiebreaker",
-			matches: []powerv1.Uncore{
+			matches: []powerv1alpha1.Uncore{
 				*newUncore("uncore-b", spec, nil, now),
 				*newUncore("uncore-a", spec, nil, now),
 			},
@@ -170,66 +170,66 @@ func TestUncore_Reconcile_InvalidSpecs(t *testing.T) {
 	die := uint(0)
 
 	tcases := []struct {
-		name            string
-		spec            powerv1.UncoreSpec
+		name        string
+		spec        powerv1alpha1.UncoreSpec
 		errContains string
 	}{
 		{
 			name:        "empty spec",
-			spec:        powerv1.UncoreSpec{},
+			spec:        powerv1alpha1.UncoreSpec{},
 			errContains: "no valid uncore configuration: requires either both sysMin and sysMax, or non-empty dieSelectors",
 		},
 		{
 			name:        "missing min in die selector",
-			spec:        powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{{Package: &pkg, Max: &max}}},
+			spec:        powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{{Package: &pkg, Max: &max}}},
 			errContains: "max, min and package fields must not be empty",
 		},
 		{
 			name:        "missing max in die selector",
-			spec:        powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{{Package: &pkg, Die: &die, Min: &min}}},
+			spec:        powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{{Package: &pkg, Die: &die, Min: &min}}},
 			errContains: "max, min and package fields must not be empty",
 		},
 		{
 			name:        "missing package in die selector",
-			spec:        powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{{Die: &die, Max: &max, Min: &min}}},
+			spec:        powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{{Die: &die, Max: &max, Min: &min}}},
 			errContains: "max, min and package fields must not be empty",
 		},
 		{
 			name: "invalid package ID",
-			spec: powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{
+			spec: powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: uintPtr(100000), Die: &die, Max: &max, Min: &min},
 			}},
 			errContains: "invalid package",
 		},
 		{
 			name: "invalid package ID (package-level tuning)",
-			spec: powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{
+			spec: powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: uintPtr(100000), Max: &max, Min: &min},
 			}},
 			errContains: "invalid package",
 		},
 		{
 			name: "invalid die ID",
-			spec: powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{
+			spec: powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: &pkg, Die: uintPtr(100000), Max: &max, Min: &min},
 			}},
 			errContains: "invalid die",
 		},
 		{
 			name:        "frequency exceeds hardware limits (system-wide)",
-			spec:        powerv1.UncoreSpec{SysMax: uintPtr(20000000000), SysMin: &min},
+			spec:        powerv1alpha1.UncoreSpec{SysMax: uintPtr(20000000000), SysMin: &min},
 			errContains: "specified Max frequency is higher than",
 		},
 		{
 			name: "frequency exceeds hardware limits (package-level)",
-			spec: powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{
+			spec: powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: &pkg, Max: uintPtr(20000000000), Min: &min},
 			}},
 			errContains: "specified Max frequency is higher than",
 		},
 		{
 			name: "frequency exceeds hardware limits (die-level)",
-			spec: powerv1.UncoreSpec{DieSelectors: &[]powerv1.DieSelector{
+			spec: powerv1alpha1.UncoreSpec{DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: &pkg, Die: &die, Max: uintPtr(20000000000), Min: &min},
 			}},
 			errContains: "specified Max frequency is higher than",
@@ -250,7 +250,7 @@ func TestUncore_Reconcile_InvalidSpecs(t *testing.T) {
 			assert.ErrorContains(t, err, tc.errContains)
 
 			// Verify error was recorded in PowerNodeState.
-			pns := &powerv1.PowerNodeState{}
+			pns := &powerv1alpha1.PowerNodeState{}
 			assert.Nil(t, r.Get(context.TODO(), client.ObjectKey{Name: nodeName + "-power-state", Namespace: PowerNamespace}, pns))
 			assert.NotNil(t, pns.Status.Uncore)
 			assert.NotEmpty(t, pns.Status.Uncore.Errors)
@@ -283,8 +283,8 @@ func TestUncore_Reconcile_InvalidFileSystem(t *testing.T) {
 	defer teardown()
 
 	objs := []runtime.Object{
-		newUncore("fs-uncore", powerv1.UncoreSpec{
-			DieSelectors: &[]powerv1.DieSelector{
+		newUncore("fs-uncore", powerv1alpha1.UncoreSpec{
+			DieSelectors: &[]powerv1alpha1.DieSelector{
 				{Package: &pkg, Die: &die, Max: &max, Min: &min},
 			},
 		}, nil, time.Now()),

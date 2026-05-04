@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/openshift-kni/kubernetes-power-manager/internal/scaling"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/podresourcesclient"
 
@@ -48,7 +48,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(powerv1.AddToScheme(scheme))
+	utilruntime.Must(powerv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

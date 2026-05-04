@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +27,7 @@ func TestNewState(t *testing.T) {
 
 func TestUpdateStateGuaranteedPods(t *testing.T) {
 	state := &State{
-		GuaranteedPods: []powerv1.GuaranteedPod{
+		GuaranteedPods: []powerv1alpha1.GuaranteedPod{
 			{Name: "pod1"},
 			{Name: "pod2"},
 			{Name: "pod3"},
@@ -35,12 +35,12 @@ func TestUpdateStateGuaranteedPods(t *testing.T) {
 	}
 
 	//Test case -- updating an existing pod
-	err := state.UpdateStateGuaranteedPods(powerv1.GuaranteedPod{Name: "pod2"})
+	err := state.UpdateStateGuaranteedPods(powerv1alpha1.GuaranteedPod{Name: "pod2"})
 	assert.Nil(t, err)
 	assert.Equal(t, state.GuaranteedPods[1].Name, "pod2")
 
 	//Test case -- adding a new pod
-	err = state.UpdateStateGuaranteedPods(powerv1.GuaranteedPod{Name: "pod4"})
+	err = state.UpdateStateGuaranteedPods(powerv1alpha1.GuaranteedPod{Name: "pod4"})
 	assert.Nil(t, err)
 	assert.Equal(t, state.GuaranteedPods[len(state.GuaranteedPods)-1].Name, "pod4")
 }
@@ -48,7 +48,7 @@ func TestUpdateStateGuaranteedPods(t *testing.T) {
 func TestGetPodFromState(t *testing.T) {
 	//Test case -- a state instance with some sample data
 	state := &State{
-		GuaranteedPods: []powerv1.GuaranteedPod{
+		GuaranteedPods: []powerv1alpha1.GuaranteedPod{
 			{Name: "pod1"},
 			{Name: "pod2"},
 		},
@@ -62,15 +62,15 @@ func TestGetPodFromState(t *testing.T) {
 	//Test case -- Non-Existing pod in the state
 	nonExistingPodName := "pod4"
 	nonExistingPod := state.GetPodFromState(nonExistingPodName, "")
-	if !reflect.DeepEqual(nonExistingPod, powerv1.GuaranteedPod{}) {
+	if !reflect.DeepEqual(nonExistingPod, powerv1alpha1.GuaranteedPod{}) {
 		t.Errorf("Expected: empty pod. Actual: Got pod %+v", nonExistingPod)
 	}
 }
 
 func TestGetCPUsFromPodState(t *testing.T) {
 	//Test case -- sample pod state with two containers
-	podState := powerv1.GuaranteedPod{
-		Containers: []powerv1.Container{
+	podState := powerv1alpha1.GuaranteedPod{
+		Containers: []powerv1alpha1.Container{
 			{ExclusiveCPUs: []uint{1, 2}},
 			{ExclusiveCPUs: []uint{3}},
 		},
@@ -89,7 +89,7 @@ func TestDeletePodFromState(t *testing.T) {
 	//Create a state instance with some sample data
 
 	state := &State{
-		GuaranteedPods: []powerv1.GuaranteedPod{
+		GuaranteedPods: []powerv1alpha1.GuaranteedPod{
 			{Name: "pod1"},
 			{Name: "pod2"},
 		},

@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	err = powerv1.AddToScheme(scheme.Scheme)
+	err = powerv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to add scheme: %v\n", err)
 		testEnv.Stop()
@@ -93,7 +93,7 @@ func setupEnvTest(t *testing.T) (client.Client, func()) {
 	require.NoError(t, err, "failed to start envtest")
 	require.NotNil(t, cfg)
 
-	err = powerv1.AddToScheme(scheme.Scheme)
+	err = powerv1alpha1.AddToScheme(scheme.Scheme)
 	require.NoError(t, err)
 
 	cl, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -114,7 +114,7 @@ func setupEnvTest(t *testing.T) (client.Client, func()) {
 // createTestPowerNodeState creates a PowerNodeState for testing.
 func createTestPowerNodeState(t *testing.T, cl client.Client, name string) {
 	t.Helper()
-	pns := &powerv1.PowerNodeState{
+	pns := &powerv1alpha1.PowerNodeState{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: PowerNamespace,
@@ -128,17 +128,17 @@ func createTestPowerNodeState(t *testing.T, cl client.Client, name string) {
 // so it's never null when all other controllers release their fields.
 func applyNodeInfo(t *testing.T, cl client.Client, pnsName string) {
 	t.Helper()
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pnsName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
-			NodeInfo: &powerv1.NodeInfo{
+		Status: powerv1alpha1.PowerNodeStateStatus{
+			NodeInfo: &powerv1alpha1.NodeInfo{
 				CPUCapacity:  96,
 				Architecture: "amd64",
 			},
@@ -152,7 +152,7 @@ func applyNodeInfo(t *testing.T, cl client.Client, pnsName string) {
 // deleteTestPowerNodeState deletes a PowerNodeState created during a test.
 func deleteTestPowerNodeState(t *testing.T, cl client.Client, name string) {
 	t.Helper()
-	pns := &powerv1.PowerNodeState{
+	pns := &powerv1alpha1.PowerNodeState{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: PowerNamespace,
@@ -165,10 +165,10 @@ func deleteTestPowerNodeState(t *testing.T, cl client.Client, name string) {
 }
 
 // newTestPowerProfile creates a PowerProfile for testing.
-func newTestPowerProfile(name string, shared bool) *powerv1.PowerProfile {
-	return &powerv1.PowerProfile{
+func newTestPowerProfile(name string, shared bool) *powerv1alpha1.PowerProfile {
+	return &powerv1alpha1.PowerProfile{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: PowerNamespace},
-		Spec:       powerv1.PowerProfileSpec{Shared: shared},
+		Spec:       powerv1alpha1.PowerProfileSpec{Shared: shared},
 	}
 }
 
@@ -185,20 +185,20 @@ func createTestNode(t *testing.T, cl client.Client, name string, labels map[stri
 }
 
 // createTestPowerNodeConfig creates a PowerNodeConfig with the given spec.
-func createTestPowerNodeConfig(t *testing.T, cl client.Client, name string, sharedProfile string, matchLabels map[string]string, reserved []powerv1.ReservedSpec) {
+func createTestPowerNodeConfig(t *testing.T, cl client.Client, name string, sharedProfile string, matchLabels map[string]string, reserved []powerv1alpha1.ReservedSpec) {
 	t.Helper()
-	config := &powerv1.PowerNodeConfig{
+	config := &powerv1alpha1.PowerNodeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: PowerNamespace,
 		},
-		Spec: powerv1.PowerNodeConfigSpec{
+		Spec: powerv1alpha1.PowerNodeConfigSpec{
 			SharedPowerProfile: sharedProfile,
 			ReservedCPUs:       reserved,
 		},
 	}
 	if matchLabels != nil {
-		config.Spec.NodeSelector = powerv1.NodeSelector{
+		config.Spec.NodeSelector = powerv1alpha1.NodeSelector{
 			LabelSelector: metav1.LabelSelector{MatchLabels: matchLabels},
 		}
 	}

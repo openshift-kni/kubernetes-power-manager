@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: cstates.power.openshift.io
+  name: cstates.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: CStates
     listKind: CStatesList
@@ -67,9 +67,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: powerconfigs.power.openshift.io
+  name: powerconfigs.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: PowerConfig
     listKind: PowerConfigList
@@ -130,9 +130,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: powerpods.power.openshift.io
+  name: powerpods.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: PowerPod
     listKind: PowerPodList
@@ -176,9 +176,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: powerprofiles.power.openshift.io
+  name: powerprofiles.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: PowerProfile
     listKind: PowerProfileList
@@ -244,9 +244,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: timeofdaycronjobs.power.openshift.io
+  name: timeofdaycronjobs.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: TimeOfDayCronJob
     listKind: TimeOfDayCronJobList
@@ -459,9 +459,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: timeofdaycronjobs.power.openshift.io
+  name: timeofdaycronjobs.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: TimeOfDayCronJob
     listKind: TimeOfDayCronJobList
@@ -625,9 +625,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: timeofdays.power.openshift.io
+  name: timeofdays.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: TimeOfDay
     listKind: TimeOfDayList
@@ -780,9 +780,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: uncores.power.openshift.io
+  name: uncores.power.cluster-power-manager.github.io
 spec:
-  group: power.openshift.io
+  group: power.cluster-power-manager.github.io
   names:
     kind: Uncore
     listKind: UncoreList

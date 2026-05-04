@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,9 +51,9 @@ type PowerNodeConfigReconciler struct {
 	PowerLibrary power.Host
 }
 
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodeconfigs,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodeconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=list;watch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
@@ -115,13 +115,13 @@ func (r *PowerNodeConfigReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // getMatchingPowerNodeConfigs returns all PowerNodeConfigs whose nodeSelector matches this node.
-func (r *PowerNodeConfigReconciler) getMatchingPowerNodeConfigs(ctx context.Context, nodeName string) ([]powerv1.PowerNodeConfig, error) {
+func (r *PowerNodeConfigReconciler) getMatchingPowerNodeConfigs(ctx context.Context, nodeName string) ([]powerv1alpha1.PowerNodeConfig, error) {
 	node := &corev1.Node{}
 	if err := r.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		return nil, fmt.Errorf("failed to get node %s: %w", nodeName, err)
 	}
 
-	configList := &powerv1.PowerNodeConfigList{}
+	configList := &powerv1alpha1.PowerNodeConfigList{}
 	if err := r.List(ctx, configList, client.InNamespace(PowerNamespace)); err != nil {
 		return nil, fmt.Errorf("failed to list PowerNodeConfigs: %w", err)
 	}
@@ -130,7 +130,7 @@ func (r *PowerNodeConfigReconciler) getMatchingPowerNodeConfigs(ctx context.Cont
 }
 
 // powerNodeConfigActiveName extracts the active PowerNodeConfig name from PowerNodeState status.
-func powerNodeConfigActiveName(s *powerv1.PowerNodeStateStatus) string {
+func powerNodeConfigActiveName(s *powerv1alpha1.PowerNodeStateStatus) string {
 	if s.CPUPools != nil && s.CPUPools.Shared != nil {
 		return s.CPUPools.Shared.PowerNodeConfig
 	}
@@ -138,10 +138,10 @@ func powerNodeConfigActiveName(s *powerv1.PowerNodeStateStatus) string {
 }
 
 // powerNodeConfigMeta extracts ObjectMeta from a PowerNodeConfig for use with generic helpers.
-func powerNodeConfigMeta(c powerv1.PowerNodeConfig) metav1.ObjectMeta { return c.ObjectMeta }
+func powerNodeConfigMeta(c powerv1alpha1.PowerNodeConfig) metav1.ObjectMeta { return c.ObjectMeta }
 
 // powerNodeConfigSelector extracts the LabelSelector from a PowerNodeConfig for use with filterByNodeSelector.
-func powerNodeConfigSelector(c powerv1.PowerNodeConfig) metav1.LabelSelector {
+func powerNodeConfigSelector(c powerv1alpha1.PowerNodeConfig) metav1.LabelSelector {
 	return c.Spec.NodeSelector.LabelSelector
 }
 
@@ -149,7 +149,7 @@ func powerNodeConfigSelector(c powerv1.PowerNodeConfig) metav1.LabelSelector {
 // in the Power Library, and updates PowerNodeState status via SSA.
 func (r *PowerNodeConfigReconciler) applyPowerNodeConfig(
 	ctx context.Context,
-	config *powerv1.PowerNodeConfig,
+	config *powerv1alpha1.PowerNodeConfig,
 	nodeName string,
 	conflictErrors []string,
 	logger *logr.Logger,
@@ -199,12 +199,12 @@ func (r *PowerNodeConfigReconciler) applyPowerNodeConfig(
 // has spec.shared set to true.
 func (r *PowerNodeConfigReconciler) validatePowerNodeConfigProfiles(
 	ctx context.Context,
-	config *powerv1.PowerNodeConfig,
+	config *powerv1alpha1.PowerNodeConfig,
 	nodeName string,
 	logger *logr.Logger,
 ) error {
 	// Validate the shared pool profile is marked as shared.
-	sharedProfile := &powerv1.PowerProfile{}
+	sharedProfile := &powerv1alpha1.PowerProfile{}
 	if err := r.Get(ctx, client.ObjectKey{Name: config.Spec.SharedPowerProfile, Namespace: PowerNamespace}, sharedProfile); err != nil {
 		if errors.IsNotFound(err) {
 			return fmt.Errorf("PowerProfile '%s' not found", config.Spec.SharedPowerProfile)
@@ -246,7 +246,7 @@ func (r *PowerNodeConfigReconciler) validatePowerNodeConfigProfiles(
 }
 
 // configureSharedPool sets the shared pool's power profile from the config's referenced profile.
-func (r *PowerNodeConfigReconciler) configureSharedPool(config *powerv1.PowerNodeConfig, logger *logr.Logger) error {
+func (r *PowerNodeConfigReconciler) configureSharedPool(config *powerv1alpha1.PowerNodeConfig, logger *logr.Logger) error {
 	pool := r.PowerLibrary.GetExclusivePool(config.Spec.SharedPowerProfile)
 	if pool == nil {
 		return fmt.Errorf("pool for profile '%s' not found", config.Spec.SharedPowerProfile)
@@ -270,10 +270,10 @@ func (r *PowerNodeConfigReconciler) configureSharedPool(config *powerv1.PowerNod
 // configureReservedPools removes existing pseudo-reserved pools, then creates new ones
 // based on the config's reservedCPUs spec. Returns per-group status and any errors.
 func (r *PowerNodeConfigReconciler) configureReservedPools(
-	config *powerv1.PowerNodeConfig,
+	config *powerv1alpha1.PowerNodeConfig,
 	nodeName string,
 	logger *logr.Logger,
-) ([]powerv1.PowerProfileCPUs, []error) {
+) ([]powerv1alpha1.PowerProfileCPUs, []error) {
 	// Remove existing pseudo-reserved pools.
 	pools := r.PowerLibrary.GetAllExclusivePools()
 	for _, p := range *pools {
@@ -286,7 +286,7 @@ func (r *PowerNodeConfigReconciler) configureReservedPools(
 
 	// Process each reserved CPU group.
 	var reservedErrors []error
-	var reservedProfileCPUs []powerv1.PowerProfileCPUs
+	var reservedProfileCPUs []powerv1alpha1.PowerProfileCPUs
 	for _, rc := range config.Spec.ReservedCPUs {
 		// Move cores to shared first to prevent exclusive→reserved conflicts.
 		if err := r.PowerLibrary.GetSharedPool().MoveCpuIDs(rc.Cores); err != nil {
@@ -299,13 +299,13 @@ func (r *PowerNodeConfigReconciler) configureReservedPools(
 				if err := r.PowerLibrary.GetReservedPool().MoveCpuIDs(rc.Cores); err != nil {
 					return reservedProfileCPUs, []error{fmt.Errorf("failed to move cores to reserved: %w", err)}
 				}
-				reservedProfileCPUs = append(reservedProfileCPUs, powerv1.PowerProfileCPUs{
+				reservedProfileCPUs = append(reservedProfileCPUs, powerv1alpha1.PowerProfileCPUs{
 					PowerProfile: rc.PowerProfile,
 					CPUIDs:       prettifyCoreList(rc.Cores),
 					Errors:       []string{err.Error()},
 				})
 			} else {
-				reservedProfileCPUs = append(reservedProfileCPUs, powerv1.PowerProfileCPUs{
+				reservedProfileCPUs = append(reservedProfileCPUs, powerv1alpha1.PowerProfileCPUs{
 					PowerProfile: rc.PowerProfile,
 					CPUIDs:       prettifyCoreList(rc.Cores),
 				})
@@ -314,7 +314,7 @@ func (r *PowerNodeConfigReconciler) configureReservedPools(
 			if err := r.PowerLibrary.GetReservedPool().MoveCpuIDs(rc.Cores); err != nil {
 				return reservedProfileCPUs, []error{fmt.Errorf("failed to move cores to reserved: %w", err)}
 			}
-			reservedProfileCPUs = append(reservedProfileCPUs, powerv1.PowerProfileCPUs{
+			reservedProfileCPUs = append(reservedProfileCPUs, powerv1alpha1.PowerProfileCPUs{
 				CPUIDs: prettifyCoreList(rc.Cores),
 			})
 		}
@@ -343,7 +343,7 @@ func (r *PowerNodeConfigReconciler) cleanupPowerNodeConfigPools(ctx context.Cont
 
 // createReservedPool creates a pseudo-reserved exclusive pool for reserved CPUs
 // that have a specific PowerProfile assigned.
-func (r *PowerNodeConfigReconciler) createReservedPool(rc powerv1.ReservedSpec, nodeName string) error {
+func (r *PowerNodeConfigReconciler) createReservedPool(rc powerv1alpha1.ReservedSpec, nodeName string) error {
 	poolName := fmt.Sprintf("%s-reserved-%v", nodeName, rc.Cores)
 	pseudoPool, err := r.PowerLibrary.AddExclusivePool(poolName)
 	if err != nil {
@@ -374,14 +374,14 @@ func (r *PowerNodeConfigReconciler) updatePowerNodeStatusPools(
 	configName string,
 	profileName string,
 	sharedCPUIDs string,
-	reservedProfileCPUs []powerv1.PowerProfileCPUs,
+	reservedProfileCPUs []powerv1alpha1.PowerProfileCPUs,
 	statusErrors []string,
 	logger *logr.Logger,
 ) error {
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 
-	cpuPools := &powerv1.CPUPoolsStatus{
-		Shared: &powerv1.SharedCPUPoolStatus{
+	cpuPools := &powerv1alpha1.CPUPoolsStatus{
+		Shared: &powerv1alpha1.SharedCPUPoolStatus{
 			PowerProfile:    profileName,
 			PowerNodeConfig: configName,
 			CPUIDs:          sharedCPUIDs,
@@ -389,7 +389,7 @@ func (r *PowerNodeConfigReconciler) updatePowerNodeStatusPools(
 		},
 	}
 	if len(reservedProfileCPUs) > 0 {
-		cpuPools.Reserved = []powerv1.ReservedCPUPoolStatus{
+		cpuPools.Reserved = []powerv1alpha1.ReservedCPUPoolStatus{
 			{
 				PowerNodeConfig:  configName,
 				PowerProfileCPUs: reservedProfileCPUs,
@@ -397,16 +397,16 @@ func (r *PowerNodeConfigReconciler) updatePowerNodeStatusPools(
 		}
 	}
 
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
 			CPUPools: cpuPools,
 		},
 	}
@@ -427,20 +427,20 @@ func (r *PowerNodeConfigReconciler) updatePowerNodeStatusPools(
 func (r *PowerNodeConfigReconciler) removePowerNodeStatusPools(ctx context.Context, nodeName string, logger *logr.Logger) error {
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
-			CPUPools: &powerv1.CPUPoolsStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
+			CPUPools: &powerv1alpha1.CPUPoolsStatus{
 				// Empty reserved list (omitzero → "[]") triggers SSA field manager cascade cleanup.
 				// Shared is nil → released by prune. Both are removed, field manager is cleaned up.
-				Reserved: []powerv1.ReservedCPUPoolStatus{},
+				Reserved: []powerv1alpha1.ReservedCPUPoolStatus{},
 			},
 		},
 	}
@@ -461,7 +461,7 @@ func (r *PowerNodeConfigReconciler) removePowerNodeStatusPools(ctx context.Conte
 // enqueuePowerNodeConfigReconcile returns a single reconcile request to trigger
 // a full re-evaluation of all PowerNodeConfigs for this node.
 func (r *PowerNodeConfigReconciler) enqueuePowerNodeConfigReconcile(ctx context.Context, _ client.Object) []reconcile.Request {
-	configList := &powerv1.PowerNodeConfigList{}
+	configList := &powerv1alpha1.PowerNodeConfigList{}
 	if err := r.List(ctx, configList, client.InNamespace(PowerNamespace)); err != nil {
 		r.Log.Error(err, "failed to list PowerNodeConfigs")
 		return nil
@@ -501,8 +501,8 @@ func (r *PowerNodeConfigReconciler) enqueueMatchingPowerNodeConfigReconcile(ctx 
 
 // describeConflictingConfig returns a conflict error string for a non-selected PowerNodeConfig,
 // including validation details (e.g., non-shared profile) to help users diagnose misconfiguration.
-func (r *PowerNodeConfigReconciler) describeConflictingConfig(ctx context.Context, config *powerv1.PowerNodeConfig) string {
-	profile := &powerv1.PowerProfile{}
+func (r *PowerNodeConfigReconciler) describeConflictingConfig(ctx context.Context, config *powerv1alpha1.PowerNodeConfig) string {
+	profile := &powerv1alpha1.PowerProfile{}
 	if err := r.Get(ctx, client.ObjectKey{Name: config.Spec.SharedPowerProfile, Namespace: PowerNamespace}, profile); err != nil {
 		if errors.IsNotFound(err) {
 			return fmt.Sprintf("conflicting PowerNodeConfig: %s (profile '%s' not found)", config.Name, config.Spec.SharedPowerProfile)
@@ -516,7 +516,7 @@ func (r *PowerNodeConfigReconciler) describeConflictingConfig(ctx context.Contex
 }
 
 // getExclusiveEntries safely extracts the exclusive pool entries from a PowerNodeState.
-func getExclusiveEntries(pns *powerv1.PowerNodeState) []powerv1.ExclusiveCPUPoolStatus {
+func getExclusiveEntries(pns *powerv1alpha1.PowerNodeState) []powerv1alpha1.ExclusiveCPUPoolStatus {
 	if pns.Status.CPUPools == nil {
 		return nil
 	}
@@ -529,7 +529,7 @@ func (r *PowerNodeConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nodeName := os.Getenv("NODE_NAME")
 	return ctrl.NewControllerManagedBy(mgr).
 		// PowerNodeConfig CRUD: re-evaluate which config should be active.
-		For(&powerv1.PowerNodeConfig{}).
+		For(&powerv1alpha1.PowerNodeConfig{}).
 		// No PowerProfile watch: the PowerProfile controller handles pool reconfiguration
 		// on profile updates/deletes. Watching profiles here would cause a redundant
 		// tear-down/rebuild of reserved pools and a race on profile deletion.
@@ -556,7 +556,7 @@ func (r *PowerNodeConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// to be refreshed. Only fires when status.cpuPools.exclusive changes on this node's
 		// PowerNodeState — changes to shared/reserved (written by this controller) are ignored
 		// to prevent a reconcile loop.
-		Watches(&powerv1.PowerNodeState{},
+		Watches(&powerv1alpha1.PowerNodeState{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueMatchingPowerNodeConfigReconcile),
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc:  func(e event.CreateEvent) bool { return false },
@@ -566,8 +566,8 @@ func (r *PowerNodeConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if e.ObjectNew.GetName() != nodeName+"-power-state" {
 						return false
 					}
-					oldPNS := e.ObjectOld.(*powerv1.PowerNodeState)
-					newPNS := e.ObjectNew.(*powerv1.PowerNodeState)
+					oldPNS := e.ObjectOld.(*powerv1alpha1.PowerNodeState)
+					newPNS := e.ObjectNew.(*powerv1alpha1.PowerNodeState)
 					oldExclusive := getExclusiveEntries(oldPNS)
 					newExclusive := getExclusiveEntries(newPNS)
 					return !reflect.DeepEqual(oldExclusive, newExclusive)

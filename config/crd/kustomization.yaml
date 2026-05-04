@@ -2,11 +2,11 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-  - bases/power.openshift.io_powernodestates.yaml
-  - bases/power.openshift.io_powernodeconfigs.yaml
-  - bases/power.openshift.io_powerprofiles.yaml
-  - bases/power.openshift.io_powerconfigs.yaml
-  - bases/power.openshift.io_uncores.yaml
+  - bases/power.cluster-power-manager.github.io_powernodestates.yaml
+  - bases/power.cluster-power-manager.github.io_powernodeconfigs.yaml
+  - bases/power.cluster-power-manager.github.io_powerprofiles.yaml
+  - bases/power.cluster-power-manager.github.io_powerconfigs.yaml
+  - bases/power.cluster-power-manager.github.io_uncores.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

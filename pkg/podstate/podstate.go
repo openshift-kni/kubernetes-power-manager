@@ -1,22 +1,22 @@
 package podstate
 
 import (
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 )
 
 type State struct {
-	GuaranteedPods []powerv1.GuaranteedPod
+	GuaranteedPods []powerv1alpha1.GuaranteedPod
 }
 
 func NewState() (*State, error) {
 	state := &State{}
-	guaranteedPods := make([]powerv1.GuaranteedPod, 0)
+	guaranteedPods := make([]powerv1alpha1.GuaranteedPod, 0)
 	state.GuaranteedPods = guaranteedPods
 
 	return state, nil
 }
 
-func (s *State) UpdateStateGuaranteedPods(guaranteedPod powerv1.GuaranteedPod) error {
+func (s *State) UpdateStateGuaranteedPods(guaranteedPod powerv1alpha1.GuaranteedPod) error {
 	for i, existingPod := range s.GuaranteedPods {
 		if existingPod.Name == guaranteedPod.Name && existingPod.Namespace == guaranteedPod.Namespace {
 			s.GuaranteedPods[i] = guaranteedPod
@@ -28,17 +28,17 @@ func (s *State) UpdateStateGuaranteedPods(guaranteedPod powerv1.GuaranteedPod) e
 	return nil
 }
 
-func (s *State) GetPodFromState(podName string, podNamespace string) powerv1.GuaranteedPod {
+func (s *State) GetPodFromState(podName string, podNamespace string) powerv1alpha1.GuaranteedPod {
 	for _, existingPod := range s.GuaranteedPods {
 		if existingPod.Name == podName && existingPod.Namespace == podNamespace {
 			return existingPod
 		}
 	}
 
-	return powerv1.GuaranteedPod{}
+	return powerv1alpha1.GuaranteedPod{}
 }
 
-func (s *State) GetCPUsFromPodState(podState powerv1.GuaranteedPod) []uint {
+func (s *State) GetCPUsFromPodState(podState powerv1alpha1.GuaranteedPod) []uint {
 	cpus := make([]uint, 0)
 	for _, container := range podState.Containers {
 		cpus = append(cpus, container.ExclusiveCPUs...)

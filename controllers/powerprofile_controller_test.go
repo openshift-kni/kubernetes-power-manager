@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zapcore"
@@ -56,7 +56,7 @@ func createProfileReconcilerObject(objs []runtime.Object) (*PowerProfileReconcil
 	s := scheme.Scheme
 
 	// Add route Openshift scheme
-	if err := powerv1.AddToScheme(s); err != nil {
+	if err := powerv1alpha1.AddToScheme(s); err != nil {
 		return nil, err
 	}
 
@@ -64,7 +64,7 @@ func createProfileReconcilerObject(objs []runtime.Object) (*PowerProfileReconcil
 	cl := fake.NewClientBuilder().
 		WithScheme(s).
 		WithRuntimeObjects(objs...).
-		WithStatusSubresource(&powerv1.PowerNodeState{}).
+		WithStatusSubresource(&powerv1alpha1.PowerNodeState{}).
 		Build()
 
 	// Create a ReconcileNode object with the scheme and fake client.
@@ -88,23 +88,23 @@ func TestPowerProfile_Reconcile_ExclusivePoolCreation(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		powerprofile *powerv1.PowerProfile
+		powerprofile *powerv1alpha1.PowerProfile
 	}{
 		{
 			name: "Exclusive pool creation",
-			powerprofile: &powerv1.PowerProfile{
+			powerprofile: &powerv1alpha1.PowerProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "performance",
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerProfileSpec{
-					PStates: powerv1.PStatesConfig{
+				Spec: powerv1alpha1.PowerProfileSpec{
+					PStates: powerv1alpha1.PStatesConfig{
 						Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 						Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 						Epp:      "performance",
 						Governor: "powersave",
 					},
-					CStates: powerv1.CStatesConfig{
+					CStates: powerv1alpha1.CStatesConfig{
 						Names: map[string]bool{
 							"C0":  true,
 							"C1":  true,
@@ -116,19 +116,19 @@ func TestPowerProfile_Reconcile_ExclusivePoolCreation(t *testing.T) {
 		},
 		{
 			name: "Exclusive pool creation with cstates latency",
-			powerprofile: &powerv1.PowerProfile{
+			powerprofile: &powerv1alpha1.PowerProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "performance",
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerProfileSpec{
-					PStates: powerv1.PStatesConfig{
+				Spec: powerv1alpha1.PowerProfileSpec{
+					PStates: powerv1alpha1.PStatesConfig{
 						Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 						Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 						Epp:      "performance",
 						Governor: "powersave",
 					},
-					CStates: powerv1.CStatesConfig{
+					CStates: powerv1alpha1.CStatesConfig{
 						MaxLatencyUs: &[]int{10}[0],
 					},
 				},
@@ -192,14 +192,14 @@ func TestPowerProfile_Reconcile_ExclusivePoolCreation(t *testing.T) {
 // basic shared pool scenario
 func TestPowerProfile_Reconcile_SharedPoolCreation(t *testing.T) {
 	clientObjs := []runtime.Object{
-		&powerv1.PowerProfile{
+		&powerv1alpha1.PowerProfile{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "shared",
 				Namespace: PowerNamespace,
 			},
-			Spec: powerv1.PowerProfileSpec{
+			Spec: powerv1alpha1.PowerProfileSpec{
 				Shared: true,
-				PStates: powerv1.PStatesConfig{
+				PStates: powerv1alpha1.PStatesConfig{
 					Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 					Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 					Epp: "",
@@ -264,13 +264,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileNotInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
@@ -294,13 +294,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileNotInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: nil,
 							Min: nil,
 							Epp: "performance",
@@ -324,13 +324,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileNotInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "user-created",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "user-created",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "",
@@ -405,13 +405,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
@@ -435,13 +435,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: nil,
 							Min: nil,
 							Epp: "performance",
@@ -465,13 +465,13 @@ func TestPowerProfile_Reconcile_NonPowerProfileInLibrary(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "user-created",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "user-created",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "",
@@ -634,13 +634,13 @@ func TestPowerProfile_Reconcile_MaxMinFrequencyHandling(t *testing.T) {
 			t.Setenv("NODE_NAME", tc.nodeName)
 
 			clientObjs := []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      tc.profileName,
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max:      tc.max,
 							Min:      tc.min,
 							Epp:      tc.epp,
@@ -776,13 +776,13 @@ func TestPowerProfile_Reconcile_MaxMinFrequencyValidationErrors(t *testing.T) {
 			t.Setenv("NODE_NAME", tc.nodeName)
 
 			clientObjs := []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      tc.profileName,
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max:      tc.max,
 							Min:      tc.min,
 							Epp:      tc.epp,
@@ -840,13 +840,13 @@ func TestPowerProfile_Reconcile_IncorrectEppValue(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "user-created",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "user-created",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "incorrect",
@@ -884,7 +884,7 @@ func TestPowerProfile_Reconcile_IncorrectEppValue(t *testing.T) {
 			assert.ErrorContains(t, err, tc.expectedError)
 
 			// Profile should still exist (controller doesn't delete it, just returns error)
-			profile := &powerv1.PowerProfile{}
+			profile := &powerv1alpha1.PowerProfile{}
 			err = r.Client.Get(context.TODO(), client.ObjectKey{
 				Name:      tc.profileName,
 				Namespace: PowerNamespace,
@@ -907,14 +907,14 @@ func TestPowerProfile_Reconcile_SharedProfileDoesNotExistInLibrary(t *testing.T)
 			nodeName:    "TestNode",
 			profileName: "shared",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "shared",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
+					Spec: powerv1alpha1.PowerProfileSpec{
 						Shared: true,
-						PStates: powerv1.PStatesConfig{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 800},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 800},
 						},
@@ -966,8 +966,8 @@ func TestPowerProfile_Reconcile_DeleteProfile(t *testing.T) {
 					},
 					Status: corev1.NodeStatus{
 						Capacity: map[corev1.ResourceName]resource.Quantity{
-							CPUResource:                      *resource.NewQuantity(42, resource.DecimalSI),
-							"power.openshift.io/performance": *resource.NewQuantity(42, resource.DecimalSI),
+							CPUResource: *resource.NewQuantity(42, resource.DecimalSI),
+							"power.cluster-power-manager.github.io/performance": *resource.NewQuantity(42, resource.DecimalSI),
 						},
 					},
 				},
@@ -1051,13 +1051,13 @@ func TestPowerProfile_Reconcile_AcpiDriver(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
@@ -1081,13 +1081,13 @@ func TestPowerProfile_Reconcile_AcpiDriver(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: nil,
 							Min: nil,
 							Epp: "performance",
@@ -1111,13 +1111,13 @@ func TestPowerProfile_Reconcile_AcpiDriver(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "user-created",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "user-created",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "",
@@ -1223,13 +1223,13 @@ func TestPowerProfile_Reconcile_LibraryErrs(t *testing.T) {
 				return assert.ErrorContains(t, e, "Pool creation err")
 			},
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
@@ -1268,13 +1268,13 @@ func TestPowerProfile_Reconcile_LibraryErrs(t *testing.T) {
 				return assert.ErrorContains(t, e, "Set profile err")
 			},
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
@@ -1405,14 +1405,14 @@ func TestPowerProfile_Reconcile_FeatureNotSupportedErr(t *testing.T) {
 			testCase:    "Test Case 1 - Shared profile",
 			profileName: "shared",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "shared",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
+					Spec: powerv1alpha1.PowerProfileSpec{
 						Shared: true,
-						PStates: powerv1.PStatesConfig{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "power",
@@ -1435,13 +1435,13 @@ func TestPowerProfile_Reconcile_FeatureNotSupportedErr(t *testing.T) {
 			testCase:    "Test Case 2 - Exclusive profile",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "power",
@@ -1525,9 +1525,9 @@ func TestPowerProfile_Reconcile_ClientErrs(t *testing.T) {
 				mkwriter.On("Update", mock.Anything, mock.Anything).Return(nil)
 				mkwriter.On("Patch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				mkcl := new(errClient)
-				mkcl.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1.PowerProfile")).Return(errors.NewNotFound(schema.GroupResource{}, "profile"))
+				mkcl.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.PowerProfile")).Return(errors.NewNotFound(schema.GroupResource{}, "profile"))
 				mkcl.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1.Node")).Return(fmt.Errorf("client get node error"))
-				mkcl.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1.PowerNodeState")).Return(errors.NewNotFound(schema.GroupResource{}, "powernodestate"))
+				mkcl.On("Get", mock.Anything, mock.Anything, mock.AnythingOfType("*v1alpha1.PowerNodeState")).Return(errors.NewNotFound(schema.GroupResource{}, "powernodestate"))
 				mkcl.On("Status").Return(mkwriter)
 				return mkcl
 			},
@@ -1572,13 +1572,13 @@ func TestPowerProfile_Reconcile_UnsupportedGovernor(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "performance",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp:      "performance",
@@ -1603,14 +1603,14 @@ func TestPowerProfile_Reconcile_UnsupportedGovernor(t *testing.T) {
 			nodeName:    "TestNode",
 			profileName: "shared",
 			clientObjs: []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "shared",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
+					Spec: powerv1alpha1.PowerProfileSpec{
 						Shared: true,
-						PStates: powerv1.PStatesConfig{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1000},
 							Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1000},
 							Governor: "made up",
@@ -1685,13 +1685,13 @@ func FuzzPowerProfileController(f *testing.F) {
 		t.Setenv("NODE_NAME", nodeName)
 
 		clientObjs := []runtime.Object{
-			&powerv1.PowerProfile{
+			&powerv1alpha1.PowerProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      prof,
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerProfileSpec{
-					PStates: powerv1.PStatesConfig{
+				Spec: powerv1alpha1.PowerProfileSpec{
+					PStates: powerv1alpha1.PStatesConfig{
 						Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: int32(maxVal)},
 						Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: int32(minVal)},
 						Epp:      epp,
@@ -1846,19 +1846,19 @@ func TestPowerProfile_Reconcile_ProfileUpdateAffectsAllPools(t *testing.T) {
 
 			// Updated profile
 			clientObjs := []runtime.Object{
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      tc.profileName,
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp:      "performance",
 							Governor: "powersave",
 						},
-						CStates: powerv1.CStatesConfig{
+						CStates: powerv1alpha1.CStatesConfig{
 							Names: map[string]bool{
 								"C0":  true,
 								"C1":  true,
@@ -1981,7 +1981,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 	testCases := []struct {
 		name                    string
 		profileName             string
-		nodeSelector            *powerv1.NodeSelector
+		nodeSelector            *powerv1alpha1.NodeSelector
 		cpuCapacity             string
 		nodeLabels              map[string]string
 		totalCPUs               int
@@ -2004,7 +2004,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Empty selector - applies to all nodes",
 			profileName: "empty-selector-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{},
 			},
 			cpuCapacity:             "100%",
@@ -2017,7 +2017,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Matching MatchLabels - should apply",
 			profileName: "matching-labels-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"node-type": "worker",
@@ -2039,7 +2039,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Non-matching MatchLabels - should not apply",
 			profileName: "non-matching-labels-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"node-type": "master",
@@ -2060,7 +2060,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Matching MatchExpressions - should apply",
 			profileName: "matching-expressions-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -2088,7 +2088,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Non-matching MatchExpressions - should not apply",
 			profileName: "non-matching-expressions-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -2112,7 +2112,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Missing required label - should not apply",
 			profileName: "missing-label-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"required-label": "value",
@@ -2167,7 +2167,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "High percentage capacity",
 			profileName: "high-percentage-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"high-performance": "true",
@@ -2189,7 +2189,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Complex selector with custom capacity",
 			profileName: "complex-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"node-type": "worker",
@@ -2222,7 +2222,7 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 		{
 			name:        "Shared profile with selector",
 			profileName: "shared-selector-profile",
-			nodeSelector: &powerv1.NodeSelector{
+			nodeSelector: &powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"shared-eligible": "true",
@@ -2260,13 +2260,13 @@ func TestPowerProfile_Reconcile_NodeSelectorAndCapacity(t *testing.T) {
 			}
 
 			// Create PowerProfile
-			profile := &powerv1.PowerProfile{
+			profile := &powerv1alpha1.PowerProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.profileName,
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerProfileSpec{
-					PStates: powerv1.PStatesConfig{
+				Spec: powerv1alpha1.PowerProfileSpec{
+					PStates: powerv1alpha1.PStatesConfig{
 						Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 						Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 						Epp:      "performance",
@@ -2379,13 +2379,13 @@ func TestPowerProfile_Reconcile_NodeSelectorCleanup(t *testing.T) {
 		},
 	}
 
-	profile := &powerv1.PowerProfile{
+	profile := &powerv1alpha1.PowerProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      profileName,
 			Namespace: PowerNamespace,
 		},
-		Spec: powerv1.PowerProfileSpec{
-			NodeSelector: powerv1.NodeSelector{
+		Spec: powerv1alpha1.PowerProfileSpec{
+			NodeSelector: powerv1alpha1.NodeSelector{
 				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"node-type": "worker",
@@ -2394,7 +2394,7 @@ func TestPowerProfile_Reconcile_NodeSelectorCleanup(t *testing.T) {
 				},
 			},
 			CpuCapacity: intstr.FromString("50%"),
-			PStates: powerv1.PStatesConfig{
+			PStates: powerv1alpha1.PStatesConfig{
 				Max:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 				Min:      &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 				Epp:      "performance",

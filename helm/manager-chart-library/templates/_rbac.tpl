@@ -23,7 +23,7 @@ metadata:
   name: {{ .Values.operatorrole.name }}
   namespace: {{ .Values.operatorrole.namespace }}
 rules:
-- apiGroups: ["", "power.openshift.io", "apps", "coordination.k8s.io"]
+- apiGroups: ["", "power.cluster-power-manager.github.io", "apps", "coordination.k8s.io"]
   resources: 
     {{ range .Values.operatorrole.resources }}
     - {{ . }}
@@ -65,7 +65,7 @@ kind: ClusterRole
 metadata:
   name: {{ .Values.operatorclusterrole.name }}
 rules:
-- apiGroups: ["", "power.openshift.io", "apps"]
+- apiGroups: ["", "power.cluster-power-manager.github.io", "apps"]
   resources: 
     {{ range .Values.operatorclusterrole.resources }}
     - {{ . }}
@@ -96,7 +96,7 @@ kind: ClusterRole
 metadata:
   name: {{ .Values.agentclusterrole.name }}
 rules:
-- apiGroups: ["", "batch", "power.openshift.io"]
+- apiGroups: ["", "batch", "power.cluster-power-manager.github.io"]
   resources: 
     {{ range .Values.agentclusterrole.resources }}
     - {{ . }}

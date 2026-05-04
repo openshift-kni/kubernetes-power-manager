@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	power "github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,7 @@ import (
 func createNodeConfigReconcilerWithEnvTest(t *testing.T, cl client.Client, mockHost power.Host) *PowerNodeConfigReconciler {
 	t.Helper()
 	s := scheme.Scheme
-	_ = powerv1.AddToScheme(s)
+	_ = powerv1alpha1.AddToScheme(s)
 	return &PowerNodeConfigReconciler{
 		Client:       cl,
 		Log:          ctrl.Log.WithName("testing"),
@@ -88,7 +88,7 @@ func TestEnvTest_Reconcile_NoMatchingConfig(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 
 	// PowerNodeState should have no shared pool status.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	assert.Nil(t, pns.Status.CPUPools, "no pools should be configured when no config matches")
@@ -116,7 +116,7 @@ func TestEnvTest_Reconcile_SingleMatchingConfig(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 
 	// Verify PowerNodeState has shared pool status.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.CPUPools)
@@ -142,7 +142,7 @@ func TestEnvTest_Reconcile_WithReservedCPUs(t *testing.T) {
 	require.NoError(t, cl.Create(ctx, newTestPowerProfile("perf-prof", false)))
 	createTestPowerNodeConfig(t, cl, "my-config", "shared-prof",
 		map[string]string{"arch": "amd64"},
-		[]powerv1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf-prof"}})
+		[]powerv1alpha1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf-prof"}})
 
 	// Mock setup for shared + reserved pool configuration.
 	h := new(hostMock)
@@ -179,7 +179,7 @@ func TestEnvTest_Reconcile_WithReservedCPUs(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 
 	// Verify PowerNodeState has both shared and reserved pool status.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.CPUPools)
@@ -227,7 +227,7 @@ func TestEnvTest_Reconcile_ConflictResolution_OldestWins(t *testing.T) {
 	assert.Equal(t, ctrl.Result{}, result)
 
 	// Verify config-a was selected.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.CPUPools)
@@ -264,7 +264,7 @@ func TestEnvTest_Reconcile_ProfileValidationFailure(t *testing.T) {
 	assert.Equal(t, queuetime, result.RequeueAfter, "should requeue on validation failure")
 
 	// Verify the error is recorded in PowerNodeState status.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.CPUPools)
@@ -295,14 +295,14 @@ func TestEnvTest_Reconcile_CleanupWhenConfigDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify status was written.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
 		Name: fmt.Sprintf("%s-power-state", nodeName), Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.CPUPools)
 	require.NotNil(t, pns.Status.CPUPools.Shared)
 
 	// Delete the config.
-	config := &powerv1.PowerNodeConfig{}
+	config := &powerv1alpha1.PowerNodeConfig{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{Name: "my-config", Namespace: PowerNamespace}, config))
 	require.NoError(t, cl.Delete(ctx, config))
 

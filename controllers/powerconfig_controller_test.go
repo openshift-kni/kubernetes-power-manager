@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/openshift-kni/kubernetes-power-manager/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,12 +37,12 @@ func createConfigReconcilerObject(objs []client.Object) (*PowerConfigReconciler,
 	s := scheme.Scheme
 
 	// Add route Openshift scheme
-	if err := powerv1.AddToScheme(s); err != nil {
+	if err := powerv1alpha1.AddToScheme(s); err != nil {
 		return nil, err
 	}
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).
-		WithStatusSubresource(&powerv1.PowerConfig{}).Build()
+		WithStatusSubresource(&powerv1alpha1.PowerConfig{}).Build()
 
 	state := state.NewPowerNodeData()
 
@@ -63,12 +63,12 @@ func TestPowerConfig_Reconcile_Creation(t *testing.T) {
 			nodeName:   "TestNode",
 			configName: "test-config",
 			clientObjs: []client.Object{
-				&powerv1.PowerConfig{
+				&powerv1alpha1.PowerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-config",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerConfigSpec{
+					Spec: powerv1alpha1.PowerConfigSpec{
 						PowerNodeSelector: map[string]string{
 							"feature.node.kubernetes.io/power-node": "true",
 						},
@@ -122,7 +122,7 @@ func TestPowerConfig_Reconcile_Creation(t *testing.T) {
 			t.Errorf("%s failed: expected daemonSet '%s' to have been created", tc.testCase, NodeAgentDSName)
 		}
 
-		powerNodeState := &powerv1.PowerNodeState{}
+		powerNodeState := &powerv1alpha1.PowerNodeState{}
 		powerNodeStateName := fmt.Sprintf("%s-power-state", tc.nodeName)
 		err = r.Client.Get(context.TODO(), client.ObjectKey{
 			Name:      powerNodeStateName,
@@ -160,20 +160,20 @@ func TestPowerConfig_Reconcile_Deletion(t *testing.T) {
 						},
 					},
 				},
-				&powerv1.PowerProfile{
+				&powerv1alpha1.PowerProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "performance",
 						Namespace: PowerNamespace,
 					},
-					Spec: powerv1.PowerProfileSpec{
-						PStates: powerv1.PStatesConfig{
+					Spec: powerv1alpha1.PowerProfileSpec{
+						PStates: powerv1alpha1.PStatesConfig{
 							Max: &intstr.IntOrString{Type: intstr.Int, IntVal: 3600},
 							Min: &intstr.IntOrString{Type: intstr.Int, IntVal: 3200},
 							Epp: "performance",
 						},
 					},
 				},
-				&powerv1.PowerNodeState{
+				&powerv1alpha1.PowerNodeState{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "TestNode-power-state",
 						Namespace: PowerNamespace,
@@ -212,7 +212,7 @@ func TestPowerConfig_Reconcile_Deletion(t *testing.T) {
 			t.Fatalf("%s - error reconciling object", tc.testCase)
 		}
 
-		profiles := &powerv1.PowerProfileList{}
+		profiles := &powerv1alpha1.PowerProfileList{}
 		err = r.Client.List(context.TODO(), profiles)
 		if err != nil {
 			t.Error(err)
@@ -223,7 +223,7 @@ func TestPowerConfig_Reconcile_Deletion(t *testing.T) {
 			t.Errorf("%s failed: expected number of power profile objects is %v, got %v", tc.testCase, tc.expectedNumberOfObjects, len(profiles.Items))
 		}
 
-		powerNodeStates := &powerv1.PowerNodeStateList{}
+		powerNodeStates := &powerv1alpha1.PowerNodeStateList{}
 		err = r.Client.List(context.TODO(), powerNodeStates)
 		if err != nil {
 			t.Error(err)
@@ -250,12 +250,12 @@ func FuzzPowerConfigController(f *testing.F) {
 	f.Add("sample-config", "feature.node.kubernetes.io/power-node")
 	f.Fuzz(func(t *testing.T, name string, label string) {
 		clientObjs := []client.Object{
-			&powerv1.PowerConfig{
+			&powerv1alpha1.PowerConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerConfigSpec{
+				Spec: powerv1alpha1.PowerConfigSpec{
 					PowerNodeSelector: map[string]string{
 						label: "true",
 					},

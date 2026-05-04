@@ -13,7 +13,7 @@ usage exposed by the DPDK telemetry socket, computes a windowed utilization for 
 Scaling behavior is configured in the `PowerProfile` under `spec.cpuScalingPolicy`. For example:
 
 ```yaml
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerProfile
 metadata:
   name: dpdk-scaling

@@ -1,6 +1,6 @@
 resources:
-- power_v1_uncore.yaml
-- power_v1_powerconfig.yaml
-- power_v1_powernodeconfig.yaml
-- power_v1_shared_profile.yaml
+- power_v1alpha1_uncore.yaml
+- power_v1alpha1_powerconfig.yaml
+- power_v1alpha1_powernodeconfig.yaml
+- power_v1alpha1_shared_profile.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

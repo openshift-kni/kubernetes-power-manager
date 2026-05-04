@@ -37,11 +37,11 @@ spec:
       requests:
         memory: "200Mi"
         cpu: "$CPUs"
-        power.openshift.io/$profile: "$CPUs"
+        power.cluster-power-manager.github.io/$profile: "$CPUs"
       limits:
         memory: "200Mi"
         cpu: "$CPUs"
-        power.openshift.io/$profile: "$CPUs"
+        power.cluster-power-manager.github.io/$profile: "$CPUs"
 EOF
 }
 

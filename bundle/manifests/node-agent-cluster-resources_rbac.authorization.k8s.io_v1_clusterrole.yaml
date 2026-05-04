@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - ""
   - batch
-  - power.openshift.io
+  - power.cluster-power-manager.github.io
   resources:
   - nodes
   - nodes/status

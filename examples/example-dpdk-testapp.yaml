@@ -55,12 +55,12 @@ spec:
               cpu: "16"
               hugepages-1Gi: "5Gi"
               memory: "3Gi"
-              power.openshift.io/application-dpdk: "16"
+              power.cluster-power-manager.github.io/application-dpdk: "16"
             limits:
               cpu: "16"
               hugepages-1Gi: "5Gi"
               memory: "3Gi"
-              power.openshift.io/application-dpdk: "16"
+              power.cluster-power-manager.github.io/application-dpdk: "16"
           volumeMounts:
             - mountPath: /hugepages-1Gi
               name: hugepages-1gi
@@ -86,12 +86,12 @@ spec:
               cpu: "16"
               hugepages-1Gi: "5Gi"
               memory: "3Gi"
-              power.openshift.io/performance: "16"
+              power.cluster-power-manager.github.io/performance: "16"
             limits:
               cpu: "16"
               hugepages-1Gi: "5Gi"
               memory: "3Gi"
-              power.openshift.io/performance: "16"
+              power.cluster-power-manager.github.io/performance: "16"
           volumeMounts:
             - mountPath: /hugepages-1Gi
               name: hugepages-1gi

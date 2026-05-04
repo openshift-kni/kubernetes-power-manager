@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/openshift-kni/kubernetes-power-manager/internal/scaling"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,7 +53,7 @@ import (
 
 const (
 	PowerProfileAnnotation  = "PowerProfile"
-	ResourcePrefix          = "power.openshift.io/"
+	ResourcePrefix          = "power.cluster-power-manager.github.io/"
 	CPUResource             = "cpu"
 	WorkloadTypePollingDPDK = "polling-dpdk"
 	PowerNamespace          = "power-manager"
@@ -72,9 +72,9 @@ type PowerPodReconciler struct {
 }
 
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powerprofiles,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerprofiles,verbs=get;list;watch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 func (r *PowerPodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -107,7 +107,7 @@ func (r *PowerPodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 		// Get the pod's CPU assignments from PowerNodeState to know what to clean up.
 		powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
-		currentNodeState := &powerv1.PowerNodeState{}
+		currentNodeState := &powerv1alpha1.PowerNodeState{}
 
 		// Get the PowerNodeState to find this pod's CPU assignments and move them back to the shared pool.
 		err = r.Get(ctx, client.ObjectKey{Namespace: PowerNamespace, Name: powerNodeStateName}, currentNodeState)
@@ -226,7 +226,7 @@ func (r *PowerPodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if r.DPDKTelemetryClient == nil || r.CPUScalingManager == nil {
 			continue
 		}
-		profile := &powerv1.PowerProfile{}
+		profile := &powerv1alpha1.PowerProfile{}
 		if err := r.Get(ctx, client.ObjectKey{Namespace: PowerNamespace, Name: container.PowerProfile}, profile); err != nil {
 			if errors.IsNotFound(err) {
 				// Unlikely: profile was validated moments ago, but handle deletion between checks.
@@ -269,14 +269,14 @@ func (r *PowerPodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Finally, update the controller's state
 	logger.V(5).Info("updating the controller's internal state")
-	guaranteedPod := powerv1.GuaranteedPod{}
+	guaranteedPod := powerv1alpha1.GuaranteedPod{}
 	guaranteedPod.Node = pod.Spec.NodeName
 	guaranteedPod.Name = pod.GetName()
 	guaranteedPod.Namespace = pod.Namespace
 	guaranteedPod.UID = string(podUID)
-	stateContainers := make([]powerv1.Container, 0, len(powerContainers))
+	stateContainers := make([]powerv1alpha1.Container, 0, len(powerContainers))
 	for _, pc := range powerContainers {
-		stateContainers = append(stateContainers, powerv1.Container{
+		stateContainers = append(stateContainers, powerv1alpha1.Container{
 			Name:          pc.Name,
 			Id:            pc.ID,
 			PowerProfile:  pc.PowerProfile,
@@ -298,10 +298,10 @@ func (r *PowerPodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(ctx context.Context, containers []corev1.Container, pod *corev1.Pod, logger *logr.Logger) ([]powerv1.PowerContainer, []error) {
+func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(ctx context.Context, containers []corev1.Container, pod *corev1.Pod, logger *logr.Logger) ([]powerv1alpha1.PowerContainer, []error) {
 	logger.V(5).Info("get the power profiles from the containers")
 	var recoverableErrs []error
-	powerContainers := make([]powerv1.PowerContainer, 0)
+	powerContainers := make([]powerv1alpha1.PowerContainer, 0)
 	for _, container := range containers {
 		logger.V(5).Info("retrieving the requested power profile from the container spec")
 		containerID := strings.TrimPrefix(getContainerID(pod, container.Name), "docker://")
@@ -311,7 +311,7 @@ func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(ctx context.C
 			// Pod spec validation errors are not recoverable (pod spec is immutable).
 			// Store the error in PowerNodeState for visibility but don't trigger requeue.
 			logger.Error(err, "pod spec validation error", "container", container.Name)
-			powerContainers = append(powerContainers, powerv1.PowerContainer{
+			powerContainers = append(powerContainers, powerv1alpha1.PowerContainer{
 				Name:   container.Name,
 				ID:     containerID,
 				CPUIDs: []uint{},
@@ -336,7 +336,7 @@ func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(ctx context.C
 
 			// Add the container with its error so it appears in PowerNodeState.
 			// CPU pool reconciliation will be skipped for containers with errors.
-			powerContainers = append(powerContainers, powerv1.PowerContainer{
+			powerContainers = append(powerContainers, powerv1alpha1.PowerContainer{
 				Name:         container.Name,
 				ID:           containerID,
 				PowerProfile: profileName,
@@ -360,7 +360,7 @@ func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(ctx context.C
 			continue
 		}
 		logger.V(5).Info("creating the power container.", "ContainerID", containerID, "Cores", cleanCoreList, "Profile", profileName)
-		powerContainers = append(powerContainers, powerv1.PowerContainer{
+		powerContainers = append(powerContainers, powerv1alpha1.PowerContainer{
 			Name:         container.Name,
 			ID:           containerID,
 			CPUIDs:       cleanCoreList,
@@ -534,18 +534,18 @@ func PowerReleventPodPredicate(obj client.Object) bool {
 // PowerNodeState status using Server-Side Apply. The fieldManager parameter enables per-pod
 // ownership — each pod should use a unique field manager (e.g., "powerpod-controller.pod-uid")
 // so that SSA can track ownership at the element level for the map-type Exclusive list.
-func (r *PowerPodReconciler) applyPowerNodeStateExclusiveStatus(ctx context.Context, powerNodeStateName string, exclusive []powerv1.ExclusiveCPUPoolStatus, fieldManager string) error {
-	patchNodeState := &powerv1.PowerNodeState{
+func (r *PowerPodReconciler) applyPowerNodeStateExclusiveStatus(ctx context.Context, powerNodeStateName string, exclusive []powerv1alpha1.ExclusiveCPUPoolStatus, fieldManager string) error {
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
-			CPUPools: &powerv1.CPUPoolsStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
+			CPUPools: &powerv1alpha1.CPUPoolsStatus{
 				Exclusive: exclusive,
 			},
 		},
@@ -561,13 +561,13 @@ func (r *PowerPodReconciler) addPowerNodeStatusExclusiveEntry(
 	nodeName string,
 	podUID string,
 	podName string,
-	powerContainers []powerv1.PowerContainer,
+	powerContainers []powerv1alpha1.PowerContainer,
 	logger *logr.Logger,
 ) error {
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 	fieldManager := fmt.Sprintf("powerpod-controller.%s", podUID)
 
-	entry := []powerv1.ExclusiveCPUPoolStatus{
+	entry := []powerv1alpha1.ExclusiveCPUPoolStatus{
 		{
 			PodUID:          podUID,
 			Pod:             podName,
@@ -604,7 +604,7 @@ func (r *PowerPodReconciler) removePowerNodeStatusExclusiveEntry(
 	fieldManager := fmt.Sprintf("powerpod-controller.%s", podUID)
 
 	logger.V(5).Info("removing exclusive entry from PowerNodeState via SSA", "fieldManager", fieldManager)
-	if err := r.applyPowerNodeStateExclusiveStatus(ctx, powerNodeStateName, []powerv1.ExclusiveCPUPoolStatus{}, fieldManager); err != nil {
+	if err := r.applyPowerNodeStateExclusiveStatus(ctx, powerNodeStateName, []powerv1alpha1.ExclusiveCPUPoolStatus{}, fieldManager); err != nil {
 		if errors.IsNotFound(err) {
 			logger.V(5).Info("PowerNodeState not found, skipping exclusive pool status cleanup", "powerNodeState", powerNodeStateName)
 			return nil
@@ -630,7 +630,7 @@ func (r *PowerPodReconciler) areCPUsInSharedPool(cpuIDs []uint) bool {
 
 // generateCPUScalingOpts translates a CpuScalingPolicy and a set of CPUs
 // into a list of per-CPU scaling options used by the CPUScalingManager.
-func (r *PowerPodReconciler) generateCPUScalingOpts(scalingPolicy *powerv1.CpuScalingPolicy, cpuIDs []uint) ([]scaling.CPUScalingOpts, error) {
+func (r *PowerPodReconciler) generateCPUScalingOpts(scalingPolicy *powerv1alpha1.CpuScalingPolicy, cpuIDs []uint) ([]scaling.CPUScalingOpts, error) {
 	allCpus := r.PowerLibrary.GetAllCpus()
 	optsList := make([]scaling.CPUScalingOpts, 0, len(cpuIDs))
 
@@ -684,12 +684,12 @@ func (r *PowerPodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Pod{},
 			builder.WithPredicates(
 				predicate.NewPredicateFuncs(PowerReleventPodPredicate))).
-		Watches(&powerv1.PowerProfile{},
+		Watches(&powerv1alpha1.PowerProfile{},
 			handler.EnqueueRequestsFromMapFunc(r.powerProfileToPodRequests),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					oldProfile := e.ObjectOld.(*powerv1.PowerProfile)
-					newProfile := e.ObjectNew.(*powerv1.PowerProfile)
+					oldProfile := e.ObjectOld.(*powerv1alpha1.PowerProfile)
+					newProfile := e.ObjectNew.(*powerv1alpha1.PowerProfile)
 
 					if newProfile.Spec.Shared {
 						return false

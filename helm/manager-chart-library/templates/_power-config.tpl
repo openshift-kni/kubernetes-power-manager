@@ -1,5 +1,5 @@
 {{- define "manager-chart-library.powerconfig" -}}
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: PowerConfig
 metadata:
   name: {{ .Values.powerconfig.name }}

@@ -163,7 +163,7 @@ test: generate fmt vet manifests test-envtest
 .PHONY: test-envtest
 test-envtest: envtest manifests
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-		go test -v -tags=envtest ./api/v1/ ./controllers/ -count=1 -run 'TestEnvTest|TestSSA'
+		go test -v -tags=envtest ./api/v1alpha1/ ./controllers/ -count=1 -run 'TestEnvTest|TestSSA'
 
 # Build manager binary
 build: generate manifests

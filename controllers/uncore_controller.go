@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,11 +51,11 @@ type UncoreReconciler struct {
 	PowerLibrary power.Host
 }
 
-//+kubebuilder:rbac:groups=power.openshift.io,resources=uncores,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=power.openshift.io,resources=uncores/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=power.openshift.io,resources=uncores/finalizers,verbs=update
-//+kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates,verbs=get;list;watch
-//+kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=uncores,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=uncores/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=uncores/finalizers,verbs=update
+//+kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch
+//+kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
@@ -124,13 +124,13 @@ func (r *UncoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // getMatchingUncores returns all Uncore CRs whose nodeSelector matches this node.
-func (r *UncoreReconciler) getMatchingUncores(ctx context.Context, nodeName string) ([]powerv1.Uncore, error) {
+func (r *UncoreReconciler) getMatchingUncores(ctx context.Context, nodeName string) ([]powerv1alpha1.Uncore, error) {
 	node := &corev1.Node{}
 	if err := r.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		return nil, fmt.Errorf("failed to get node %s: %w", nodeName, err)
 	}
 
-	uncoreList := &powerv1.UncoreList{}
+	uncoreList := &powerv1alpha1.UncoreList{}
 	if err := r.List(ctx, uncoreList, client.InNamespace(PowerNamespace)); err != nil {
 		return nil, fmt.Errorf("failed to list Uncores: %w", err)
 	}
@@ -139,7 +139,7 @@ func (r *UncoreReconciler) getMatchingUncores(ctx context.Context, nodeName stri
 }
 
 // uncoreActiveName extracts the active Uncore config name from PowerNodeState status.
-func uncoreActiveName(s *powerv1.PowerNodeStateStatus) string {
+func uncoreActiveName(s *powerv1alpha1.PowerNodeStateStatus) string {
 	if s.Uncore != nil {
 		return s.Uncore.Name
 	}
@@ -147,16 +147,18 @@ func uncoreActiveName(s *powerv1.PowerNodeStateStatus) string {
 }
 
 // uncoreMeta extracts ObjectMeta from an Uncore for use with generic helpers.
-func uncoreMeta(u powerv1.Uncore) metav1.ObjectMeta { return u.ObjectMeta }
+func uncoreMeta(u powerv1alpha1.Uncore) metav1.ObjectMeta { return u.ObjectMeta }
 
 // uncoreSelector extracts the LabelSelector from an Uncore for use with filterByNodeSelector.
-func uncoreSelector(u powerv1.Uncore) metav1.LabelSelector { return u.Spec.NodeSelector.LabelSelector }
+func uncoreSelector(u powerv1alpha1.Uncore) metav1.LabelSelector {
+	return u.Spec.NodeSelector.LabelSelector
+}
 
 // applyUncoreConfig resets uncore settings, applies the selected Uncore config,
 // and updates PowerNodeState status via SSA.
 func (r *UncoreReconciler) applyUncoreConfig(
 	ctx context.Context,
-	uncore *powerv1.Uncore,
+	uncore *powerv1alpha1.Uncore,
 	nodeName string,
 	conflictErrors []string,
 	logger *logr.Logger,
@@ -297,17 +299,17 @@ func (r *UncoreReconciler) updateUncoreInPowerNodeState(
 ) error {
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
-			Uncore: &powerv1.NodeUncoreStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
+			Uncore: &powerv1alpha1.NodeUncoreStatus{
 				Name:   crName,
 				Config: configString,
 				Errors: statusErrors,
@@ -333,16 +335,16 @@ func (r *UncoreReconciler) updateUncoreInPowerNodeState(
 func (r *UncoreReconciler) removeUncoreFromPowerNodeState(ctx context.Context, nodeName string, logger *logr.Logger) error {
 	powerNodeStateName := fmt.Sprintf("%s-power-state", nodeName)
 
-	patchNodeState := &powerv1.PowerNodeState{
+	patchNodeState := &powerv1alpha1.PowerNodeState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "power.openshift.io/v1",
+			APIVersion: "power.cluster-power-manager.github.io/v1alpha1",
 			Kind:       "PowerNodeState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      powerNodeStateName,
 			Namespace: PowerNamespace,
 		},
-		Status: powerv1.PowerNodeStateStatus{
+		Status: powerv1alpha1.PowerNodeStateStatus{
 			// Uncore is nil → omitted from JSON → SSA prunes the field.
 		},
 	}
@@ -363,7 +365,7 @@ func (r *UncoreReconciler) removeUncoreFromPowerNodeState(ctx context.Context, n
 // enqueueUncoreReconcile returns a single reconcile request to trigger
 // a full re-evaluation of all Uncore CRs for this node.
 func (r *UncoreReconciler) enqueueUncoreReconcile(ctx context.Context, _ client.Object) []reconcile.Request {
-	uncoreList := &powerv1.UncoreList{}
+	uncoreList := &powerv1alpha1.UncoreList{}
 	if err := r.List(ctx, uncoreList, client.InNamespace(PowerNamespace)); err != nil {
 		r.Log.Error(err, "failed to list Uncores")
 		return nil
@@ -385,7 +387,7 @@ func (r *UncoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nodeName := os.Getenv("NODE_NAME")
 	return ctrl.NewControllerManagedBy(mgr).
 		// Uncore CRUD: re-evaluate which config should be active.
-		For(&powerv1.Uncore{},
+		For(&powerv1alpha1.Uncore{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		// Node label changes: labels determine which configs match this node.

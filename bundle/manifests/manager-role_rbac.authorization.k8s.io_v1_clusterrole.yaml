@@ -14,7 +14,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - power.openshift.io
+  - power.cluster-power-manager.github.io
   resources:
   - powerconfigs
   - powernodestates
@@ -29,7 +29,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - power.openshift.io
+  - power.cluster-power-manager.github.io
   resources:
   - powerconfigs/status
   - powernodestates/status
@@ -40,7 +40,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - power.openshift.io
+  - power.cluster-power-manager.github.io
   resources:
   - powernodeconfigs
   verbs:
@@ -48,7 +48,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - power.openshift.io
+  - power.cluster-power-manager.github.io
   resources:
   - uncores/finalizers
   verbs:

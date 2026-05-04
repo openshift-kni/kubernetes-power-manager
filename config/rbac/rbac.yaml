@@ -20,7 +20,7 @@ metadata:
   name: operator-custom-resource-definitions-role
   namespace: power-manager
 rules:
-  - apiGroups: [ "", "power.openshift.io", "apps", "coordination.k8s.io" ]
+  - apiGroups: [ "", "power.cluster-power-manager.github.io", "apps", "coordination.k8s.io" ]
     resources: [ "powerconfigs", "powerconfigs/status", "powerprofiles", "powerprofiles/status", "events", "daemonsets", "configmaps", "configmaps/status", "leases","uncores" ]
     verbs: [ "*" ]
 ---
@@ -46,7 +46,7 @@ kind: ClusterRole
 metadata:
   name: operator-nodes
 rules:
-  - apiGroups: [ "", "power.openshift.io", "apps" ]
+  - apiGroups: [ "", "power.cluster-power-manager.github.io", "apps" ]
     resources: [ "nodes", "nodes/status", "pods", "configmaps", "configmaps/status", "powerconfigs", "powerconfigs/status", "powernodeconfigs", "powernodeconfigs/status", "powerprofiles", "powerprofiles/status", "powernodestates", "powernodestates/status", "events", "daemonsets","uncores", "uncores/status" ]
     verbs: [ "*" ]
 
@@ -72,7 +72,7 @@ kind: ClusterRole
 metadata:
   name: node-agent-cluster-resources
 rules:
-  - apiGroups: [ "", "batch", "power.openshift.io" ]
+  - apiGroups: [ "", "batch", "power.cluster-power-manager.github.io" ]
     resources: [ "nodes", "nodes/status", "pods", "pods/status", "powernodeconfigs", "powerprofiles", "powerprofiles/status", "powernodestates", "powernodestates/status", "cstates", "cstates/status","uncores", "uncores/status" ]
     verbs: [ "*" ]
 ---

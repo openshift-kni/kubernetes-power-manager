@@ -5,7 +5,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "PowerConfig",
           "metadata": {
             "labels": {
@@ -25,7 +25,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "PowerProfile",
           "metadata": {
             "labels": {
@@ -56,7 +56,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "Uncore",
           "metadata": {
             "labels": {
@@ -93,32 +93,32 @@ spec:
     - description: PowerConfig is the Schema for the powerconfigs API
       displayName: Power Config
       kind: PowerConfig
-      name: powerconfigs.power.openshift.io
-      version: v1
+      name: powerconfigs.power.cluster-power-manager.github.io
+      version: v1alpha1
     - description: |-
         PowerNodeConfig is the Schema for the powernodeconfigs API.
         It configures shared and reserved CPU pools on nodes matching spec.nodeSelector.
       displayName: Power Node Config
       kind: PowerNodeConfig
-      name: powernodeconfigs.power.openshift.io
-      version: v1
+      name: powernodeconfigs.power.cluster-power-manager.github.io
+      version: v1alpha1
     - description: |-
         PowerNodeState is the Schema for the powernodestates API
         It provides per-node status for power management configuration
       displayName: Power Node State
       kind: PowerNodeState
-      name: powernodestates.power.openshift.io
-      version: v1
+      name: powernodestates.power.cluster-power-manager.github.io
+      version: v1alpha1
     - description: PowerProfile is the Schema for the powerprofiles API
       displayName: Power Profile
       kind: PowerProfile
-      name: powerprofiles.power.openshift.io
-      version: v1
+      name: powerprofiles.power.cluster-power-manager.github.io
+      version: v1alpha1
     - description: Uncore is the Schema for the uncores API
       displayName: Uncore
       kind: Uncore
-      name: uncores.power.openshift.io
-      version: v1
+      name: uncores.power.cluster-power-manager.github.io
+      version: v1alpha1
   description: The Kubernetes Power Manager bridges the gap between the container
     orchestration layer and hardware feature enablement.
   displayName: Kubernetes Power Manager

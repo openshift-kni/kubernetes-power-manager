@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,7 +45,7 @@ func TestSSA_ProfileFieldManagerOwnership(t *testing.T) {
 	require.NoError(t, err)
 
 	// Both profiles should coexist.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 
@@ -85,7 +85,7 @@ func TestSSA_ProfileRemovalPreservesOtherProfiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Only profile 2 should remain.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func TestSSA_ProfileUpdatePreservesEntry(t *testing.T) {
 	err = addPowerNodeStatusProfileEntry(ctx, cl, nodeName, newTestPowerProfile("performance", false), fmt.Errorf("epp invalid"), &logger)
 	require.NoError(t, err)
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 
@@ -143,7 +143,7 @@ func TestSSA_RemoveLastProfileDoesNotFailWithEmptyStatus(t *testing.T) {
 	require.NoError(t, err, "removing last profile should not fail")
 
 	// Verify the profile was removed.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	err = cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns)
 	require.NoError(t, err)
 	assert.Empty(t, pns.Status.PowerProfiles, "profiles should be empty after removing last one")

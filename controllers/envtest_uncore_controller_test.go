@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +55,7 @@ func TestSSA_UncoreFieldManagerOwnership(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify status was written.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "uncore-config", pns.Status.Uncore.Name)
@@ -92,7 +92,7 @@ func TestSSA_UncoreRemovalPrunesField(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the Uncore field was pruned while NodeInfo is preserved.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	assert.Nil(t, pns.Status.Uncore, "Uncore field should be pruned after removal")
 	assert.NotNil(t, pns.Status.NodeInfo, "NodeInfo should be preserved as SSA anchor")
@@ -118,7 +118,7 @@ func TestSSA_UncoreDoesNotInterfereWithOtherControllers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify both coexist — each controller owns its own fields.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 
 	// Profile should still be present.
@@ -160,7 +160,7 @@ func TestSSA_UncoreUpdateOverwritesPrevious(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the latest config is present.
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "config-b", pns.Status.Uncore.Name)
@@ -174,8 +174,8 @@ func TestSSA_UncoreUpdateOverwritesPrevious(t *testing.T) {
 // that unit tests with fake clients cannot properly cover.
 
 // createEnvTestUncore creates an Uncore CR in the envtest API server.
-func createEnvTestUncore(t *testing.T, cl client.Client, name string, spec powerv1.UncoreSpec, matchLabels map[string]string) {
-	u := &powerv1.Uncore{
+func createEnvTestUncore(t *testing.T, cl client.Client, name string, spec powerv1alpha1.UncoreSpec, matchLabels map[string]string) {
+	u := &powerv1alpha1.Uncore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: PowerNamespace,
@@ -183,7 +183,7 @@ func createEnvTestUncore(t *testing.T, cl client.Client, name string, spec power
 		Spec: spec,
 	}
 	if matchLabels != nil {
-		u.Spec.NodeSelector = powerv1.NodeSelector{
+		u.Spec.NodeSelector = powerv1alpha1.NodeSelector{
 			LabelSelector: metav1.LabelSelector{MatchLabels: matchLabels},
 		}
 	}
@@ -192,7 +192,7 @@ func createEnvTestUncore(t *testing.T, cl client.Client, name string, spec power
 
 // deleteEnvTestUncore deletes an Uncore CR from the envtest API server.
 func deleteEnvTestUncore(t *testing.T, cl client.Client, name string) {
-	u := &powerv1.Uncore{
+	u := &powerv1alpha1.Uncore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: PowerNamespace,
@@ -234,7 +234,7 @@ func TestEnvTest_UncoreReconcile_SingleCR(t *testing.T) {
 	// Use values different from hardware defaults (1200000/2400000) to verify configuration.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-sys-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-sys-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"feature.node.kubernetes.io/uncore": "true"})
 	defer deleteEnvTestUncore(t, cl, "envtest-sys-uncore")
 
@@ -244,7 +244,7 @@ func TestEnvTest_UncoreReconcile_SingleCR(t *testing.T) {
 
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2200000", "1400000"))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "envtest-sys-uncore", pns.Status.Uncore.Name)
@@ -277,11 +277,11 @@ func TestEnvTest_UncoreReconcile_ConflictResolution(t *testing.T) {
 	sysMax := uint(2200000)
 	// Both Uncores match the same node. The API server assigns creation timestamps,
 	// so the first created will be older.
-	createEnvTestUncore(t, cl, "envtest-conflict-a", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-conflict-a", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"zone": "us-east"})
 	defer deleteEnvTestUncore(t, cl, "envtest-conflict-a")
 
-	createEnvTestUncore(t, cl, "envtest-conflict-b", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-conflict-b", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"zone": "us-east"})
 	defer deleteEnvTestUncore(t, cl, "envtest-conflict-b")
 
@@ -291,7 +291,7 @@ func TestEnvTest_UncoreReconcile_ConflictResolution(t *testing.T) {
 
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2200000", "1400000"))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	// Oldest (envtest-conflict-a) should win since there's no prior active config.
@@ -323,13 +323,13 @@ func TestEnvTest_UncoreReconcile_Deletion(t *testing.T) {
 	// Create an Uncore CR with system wide min and max frequencies.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-del-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-del-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"feature.node.kubernetes.io/uncore": "true"})
 
 	// Reconcile — status should be written.
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-del-uncore", Namespace: PowerNamespace}})
 	require.NoError(t, err)
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2200000", "1400000"))
@@ -370,14 +370,14 @@ func TestEnvTest_UncoreReconcile_NonMatchingThenMatch(t *testing.T) {
 	// Create an Uncore CR with system wide min and max frequencies.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-nomatch-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-nomatch-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"zone": "us-east"})
 	defer deleteEnvTestUncore(t, cl, "envtest-nomatch-uncore")
 
 	// Reconcile — no match, no status.
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-nomatch-uncore", Namespace: PowerNamespace}})
 	require.NoError(t, err)
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	assert.Nil(t, pns.Status.Uncore, "No uncore status should be written for non-matching node")
 
@@ -422,7 +422,7 @@ func TestEnvTest_UncoreReconcile_LabelChangeRemovesMatch(t *testing.T) {
 	// Create an Uncore CR with system wide min and max frequencies.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-labeldrop-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
+	createEnvTestUncore(t, cl, "envtest-labeldrop-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax},
 		map[string]string{"zone": "us-east"})
 	defer deleteEnvTestUncore(t, cl, "envtest-labeldrop-uncore")
 
@@ -432,7 +432,7 @@ func TestEnvTest_UncoreReconcile_LabelChangeRemovesMatch(t *testing.T) {
 
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2200000", "1400000"))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "envtest-labeldrop-uncore", pns.Status.Uncore.Name)
@@ -477,8 +477,8 @@ func TestEnvTest_UncoreReconcile_DieTuning(t *testing.T) {
 	die := uint(1)
 	min := uint(1300000)
 	max := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-die-uncore", powerv1.UncoreSpec{
-		DieSelectors: &[]powerv1.DieSelector{
+	createEnvTestUncore(t, cl, "envtest-die-uncore", powerv1alpha1.UncoreSpec{
+		DieSelectors: &[]powerv1alpha1.DieSelector{
 			{Package: &pkg, Die: &die, Min: &min, Max: &max},
 		},
 	}, nil)
@@ -490,7 +490,7 @@ func TestEnvTest_UncoreReconcile_DieTuning(t *testing.T) {
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "01", fmt.Sprint(max), fmt.Sprint(min)))
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2400000", "1200000"))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "Package 0 Die 1: Min 1300000, Max 2200000", pns.Status.Uncore.Config)
@@ -520,8 +520,8 @@ func TestEnvTest_UncoreReconcile_PackageTuning(t *testing.T) {
 	pkg := uint(0)
 	min := uint(1400000)
 	max := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-pkg-uncore", powerv1.UncoreSpec{
-		DieSelectors: &[]powerv1.DieSelector{
+	createEnvTestUncore(t, cl, "envtest-pkg-uncore", powerv1alpha1.UncoreSpec{
+		DieSelectors: &[]powerv1alpha1.DieSelector{
 			{Package: &pkg, Min: &min, Max: &max},
 		},
 	}, nil)
@@ -533,7 +533,7 @@ func TestEnvTest_UncoreReconcile_PackageTuning(t *testing.T) {
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", fmt.Sprint(max), fmt.Sprint(min)))
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "01", fmt.Sprint(max), fmt.Sprint(min)))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "Package 0: Min 1400000, Max 2200000", pns.Status.Uncore.Config)
@@ -562,7 +562,7 @@ func TestEnvTest_UncoreReconcile_EmptySelectorMatchesAll(t *testing.T) {
 	// Create an Uncore CR with system wide min and max frequencies.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-global-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
+	createEnvTestUncore(t, cl, "envtest-global-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
 	defer deleteEnvTestUncore(t, cl, "envtest-global-uncore")
 
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-global-uncore", Namespace: PowerNamespace}})
@@ -570,7 +570,7 @@ func TestEnvTest_UncoreReconcile_EmptySelectorMatchesAll(t *testing.T) {
 
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", fmt.Sprint(sysMax), fmt.Sprint(sysMin)))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "envtest-global-uncore", pns.Status.Uncore.Name)
@@ -600,7 +600,7 @@ func TestEnvTest_UncoreReconcile_StickyActiveConfig(t *testing.T) {
 	sysMax := uint(2200000)
 
 	// Create first Uncore CR with system wide min and max frequencies and reconcile so it becomes active.
-	createEnvTestUncore(t, cl, "envtest-sticky-a", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
+	createEnvTestUncore(t, cl, "envtest-sticky-a", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
 	defer deleteEnvTestUncore(t, cl, "envtest-sticky-a")
 
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-sticky-a", Namespace: PowerNamespace}})
@@ -608,13 +608,13 @@ func TestEnvTest_UncoreReconcile_StickyActiveConfig(t *testing.T) {
 
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", fmt.Sprint(sysMax), fmt.Sprint(sysMin)))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "envtest-sticky-a", pns.Status.Uncore.Name)
 
 	// Create second Uncore. sticky-a is already active and should stay.
-	createEnvTestUncore(t, cl, "envtest-sticky-b", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
+	createEnvTestUncore(t, cl, "envtest-sticky-b", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
 	defer deleteEnvTestUncore(t, cl, "envtest-sticky-b")
 
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-sticky-b", Namespace: PowerNamespace}})
@@ -650,20 +650,20 @@ func TestEnvTest_UncoreReconcile_UpdateActiveConfig(t *testing.T) {
 	// Create and reconcile with initial values.
 	sysMin := uint(1400000)
 	sysMax := uint(2200000)
-	createEnvTestUncore(t, cl, "envtest-update-uncore", powerv1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
+	createEnvTestUncore(t, cl, "envtest-update-uncore", powerv1alpha1.UncoreSpec{SysMin: &sysMin, SysMax: &sysMax}, nil)
 	defer deleteEnvTestUncore(t, cl, "envtest-update-uncore")
 
 	_, err = r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKey{Name: "envtest-update-uncore", Namespace: PowerNamespace}})
 	require.NoError(t, err)
 	require.NoError(t, checkUncoreValues("testing/cpus", "00", "00", "2200000", "1400000"))
 
-	pns := &powerv1.PowerNodeState{}
+	pns := &powerv1alpha1.PowerNodeState{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: pnsName, Namespace: PowerNamespace}, pns))
 	require.NotNil(t, pns.Status.Uncore)
 	assert.Equal(t, "SysMin: 1400000, SysMax: 2200000", pns.Status.Uncore.Config)
 
 	// Update the Uncore CR with new frequency values.
-	uncore := &powerv1.Uncore{}
+	uncore := &powerv1alpha1.Uncore{}
 	require.NoError(t, cl.Get(context.TODO(), client.ObjectKey{Name: "envtest-update-uncore", Namespace: PowerNamespace}, uncore))
 	newMin := uint(1300000)
 	newMax := uint(2100000)

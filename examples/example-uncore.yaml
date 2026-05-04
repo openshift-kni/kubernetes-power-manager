@@ -1,4 +1,4 @@
-apiVersion: power.openshift.io/v1
+apiVersion: power.cluster-power-manager.github.io/v1alpha1
 kind: Uncore
 metadata:
   name: uncore-config

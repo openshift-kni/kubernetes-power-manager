@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -55,10 +55,10 @@ type PowerProfileReconciler struct {
 	PowerLibrary power.Host
 }
 
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powerprofiles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powerprofiles/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=power.openshift.io,resources=powernodestates/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerprofiles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerprofiles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 // Reconcile method that implements the reconcile loop
@@ -78,7 +78,7 @@ func (r *PowerProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Node name is passed down via the downwards API and used to make sure the PowerProfile is for this node
 	nodeName := os.Getenv("NODE_NAME")
-	profile := &powerv1.PowerProfile{}
+	profile := &powerv1alpha1.PowerProfile{}
 
 	// Defer the function to update the PowerNodeState with any errors.
 	defer func() {
@@ -281,7 +281,7 @@ func (r *PowerProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *PowerProfileReconciler) ensureExtendedResources(ctx context.Context, nodeName string, profile *powerv1.PowerProfile, logger *logr.Logger) error {
+func (r *PowerProfileReconciler) ensureExtendedResources(ctx context.Context, nodeName string, profile *powerv1alpha1.PowerProfile, logger *logr.Logger) error {
 	node := &corev1.Node{}
 	err := r.Client.Get(ctx, client.ObjectKey{
 		Name: nodeName,
@@ -351,7 +351,7 @@ func (r *PowerProfileReconciler) removeExtendedResources(ctx context.Context, no
 }
 
 // cleanupProfileFromNode removes only extended resources from a node when it no longer matches the PowerProfile selector.
-func (r *PowerProfileReconciler) cleanupProfileFromNode(ctx context.Context, profile *powerv1.PowerProfile, nodeName string, logger *logr.Logger) error {
+func (r *PowerProfileReconciler) cleanupProfileFromNode(ctx context.Context, profile *powerv1alpha1.PowerProfile, nodeName string, logger *logr.Logger) error {
 	logger.V(5).Info("Cleaning up PowerProfile extended resources from node", "profile", profile.Name, "nodeName", nodeName)
 
 	// Only remove extended resources from the node.
@@ -379,7 +379,7 @@ func (r *PowerProfileReconciler) cleanupProfileFromNode(ctx context.Context, pro
 func (r *PowerProfileReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
-			&powerv1.PowerProfile{},
+			&powerv1alpha1.PowerProfile{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Watches(
 			&corev1.Node{},
@@ -411,7 +411,7 @@ func (r *PowerProfileReconciler) nodeToProfileRequests(ctx context.Context, obj 
 	var requests []reconcile.Request
 
 	// List all PowerProfiles.
-	powerProfiles := &powerv1.PowerProfileList{}
+	powerProfiles := &powerv1alpha1.PowerProfileList{}
 	if err := r.Client.List(ctx, powerProfiles); err != nil {
 		r.Log.Error(err, "Failed to list PowerProfiles for node event handling")
 		return requests

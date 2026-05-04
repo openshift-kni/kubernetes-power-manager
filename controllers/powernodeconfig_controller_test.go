@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zapcore"
@@ -28,8 +28,8 @@ func createPowerNodeConfigReconciler(objs []runtime.Object, powerLib power.Host)
 		func(opts *zap.Options) { opts.TimeEncoder = zapcore.ISO8601TimeEncoder },
 	))
 	s := scheme.Scheme
-	_ = powerv1.AddToScheme(s)
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).WithScheme(s).WithStatusSubresource(&powerv1.PowerNodeState{}).Build()
+	_ = powerv1alpha1.AddToScheme(s)
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).WithScheme(s).WithStatusSubresource(&powerv1alpha1.PowerNodeState{}).Build()
 	return &PowerNodeConfigReconciler{
 		Client:       cl,
 		Log:          ctrl.Log.WithName("testing"),
@@ -39,20 +39,20 @@ func createPowerNodeConfigReconciler(objs []runtime.Object, powerLib power.Host)
 }
 
 // newPowerNodeConfig creates a PowerNodeConfig for testing.
-func newPowerNodeConfig(name, profile string, nodeSelectorMatchLabels map[string]string, reserved []powerv1.ReservedSpec, creationTime time.Time) *powerv1.PowerNodeConfig {
-	pnc := &powerv1.PowerNodeConfig{
+func newPowerNodeConfig(name, profile string, nodeSelectorMatchLabels map[string]string, reserved []powerv1alpha1.ReservedSpec, creationTime time.Time) *powerv1alpha1.PowerNodeConfig {
+	pnc := &powerv1alpha1.PowerNodeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         PowerNamespace,
 			CreationTimestamp: metav1.NewTime(creationTime),
 		},
-		Spec: powerv1.PowerNodeConfigSpec{
+		Spec: powerv1alpha1.PowerNodeConfigSpec{
 			SharedPowerProfile: profile,
 			ReservedCPUs:       reserved,
 		},
 	}
 	if nodeSelectorMatchLabels != nil {
-		pnc.Spec.NodeSelector = powerv1.NodeSelector{
+		pnc.Spec.NodeSelector = powerv1alpha1.NodeSelector{
 			LabelSelector: metav1.LabelSelector{MatchLabels: nodeSelectorMatchLabels},
 		}
 	}
@@ -65,14 +65,14 @@ func newTestNode(name string, labels map[string]string) *corev1.Node {
 }
 
 // newPowerNodeState creates a PowerNodeState with optional shared pool status.
-func newPowerNodeState(nodeName, activeConfig string) *powerv1.PowerNodeState {
-	pns := &powerv1.PowerNodeState{
+func newPowerNodeState(nodeName, activeConfig string) *powerv1alpha1.PowerNodeState {
+	pns := &powerv1alpha1.PowerNodeState{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeName + "-power-state", Namespace: PowerNamespace},
 	}
 	if activeConfig != "" {
-		pns.Status = powerv1.PowerNodeStateStatus{
-			CPUPools: &powerv1.CPUPoolsStatus{
-				Shared: &powerv1.SharedCPUPoolStatus{
+		pns.Status = powerv1alpha1.PowerNodeStateStatus{
+			CPUPools: &powerv1alpha1.CPUPoolsStatus{
+				Shared: &powerv1alpha1.SharedCPUPoolStatus{
 					PowerNodeConfig: activeConfig,
 					PowerProfile:    "test-profile",
 					CPUIDs:          "2-3",
@@ -95,7 +95,7 @@ func TestSelectActiveOrOldest_PowerNodeConfig(t *testing.T) {
 
 	tcases := []struct {
 		name             string
-		matches          []powerv1.PowerNodeConfig
+		matches          []powerv1alpha1.PowerNodeConfig
 		activeConfigName string
 		expectedName     string
 		expectNil        bool
@@ -107,24 +107,24 @@ func TestSelectActiveOrOldest_PowerNodeConfig(t *testing.T) {
 		},
 		{
 			name:         "single match, no active",
-			matches:      []powerv1.PowerNodeConfig{*newPowerNodeConfig("config-a", "p", nil, nil, now)},
+			matches:      []powerv1alpha1.PowerNodeConfig{*newPowerNodeConfig("config-a", "p", nil, nil, now)},
 			expectedName: "config-a",
 		},
 		{
 			name:             "single match, is active",
-			matches:          []powerv1.PowerNodeConfig{*newPowerNodeConfig("config-a", "p", nil, nil, now)},
+			matches:          []powerv1alpha1.PowerNodeConfig{*newPowerNodeConfig("config-a", "p", nil, nil, now)},
 			activeConfigName: "config-a",
 			expectedName:     "config-a",
 		},
 		{
 			name:             "single match, different active",
-			matches:          []powerv1.PowerNodeConfig{*newPowerNodeConfig("config-b", "p", nil, nil, now)},
+			matches:          []powerv1alpha1.PowerNodeConfig{*newPowerNodeConfig("config-b", "p", nil, nil, now)},
 			activeConfigName: "config-a",
 			expectedName:     "config-b",
 		},
 		{
 			name: "multiple matches, active among them",
-			matches: []powerv1.PowerNodeConfig{
+			matches: []powerv1alpha1.PowerNodeConfig{
 				*newPowerNodeConfig("config-a", "p", nil, nil, now),
 				*newPowerNodeConfig("config-b", "p", nil, nil, older),
 			},
@@ -133,7 +133,7 @@ func TestSelectActiveOrOldest_PowerNodeConfig(t *testing.T) {
 		},
 		{
 			name: "multiple matches, none active, oldest wins",
-			matches: []powerv1.PowerNodeConfig{
+			matches: []powerv1alpha1.PowerNodeConfig{
 				*newPowerNodeConfig("config-b", "p", nil, nil, now),
 				*newPowerNodeConfig("config-a", "p", nil, nil, older),
 			},
@@ -141,7 +141,7 @@ func TestSelectActiveOrOldest_PowerNodeConfig(t *testing.T) {
 		},
 		{
 			name: "multiple matches, same timestamp, name tiebreaker",
-			matches: []powerv1.PowerNodeConfig{
+			matches: []powerv1alpha1.PowerNodeConfig{
 				*newPowerNodeConfig("config-c", "p", nil, nil, now),
 				*newPowerNodeConfig("config-a", "p", nil, nil, now),
 				*newPowerNodeConfig("config-b", "p", nil, nil, now),
@@ -171,7 +171,7 @@ func TestGetMatchingPowerNodeConfigs(t *testing.T) {
 		name          string
 		nodeName      string
 		nodeLabels    map[string]string
-		configs       []*powerv1.PowerNodeConfig
+		configs       []*powerv1alpha1.PowerNodeConfig
 		expectedCount int
 		expectErr     bool
 	}{
@@ -179,21 +179,21 @@ func TestGetMatchingPowerNodeConfigs(t *testing.T) {
 			name:          "empty selector matches all nodes",
 			nodeName:      "test-node",
 			nodeLabels:    map[string]string{"role": "worker"},
-			configs:       []*powerv1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", nil, nil, time.Now())},
+			configs:       []*powerv1alpha1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", nil, nil, time.Now())},
 			expectedCount: 1,
 		},
 		{
 			name:          "label match",
 			nodeName:      "test-node",
 			nodeLabels:    map[string]string{"role": "worker"},
-			configs:       []*powerv1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", map[string]string{"role": "worker"}, nil, time.Now())},
+			configs:       []*powerv1alpha1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", map[string]string{"role": "worker"}, nil, time.Now())},
 			expectedCount: 1,
 		},
 		{
 			name:          "label mismatch",
 			nodeName:      "test-node",
 			nodeLabels:    map[string]string{"role": "worker"},
-			configs:       []*powerv1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", map[string]string{"role": "master"}, nil, time.Now())},
+			configs:       []*powerv1alpha1.PowerNodeConfig{newPowerNodeConfig("config-a", "p", map[string]string{"role": "master"}, nil, time.Now())},
 			expectedCount: 0,
 		},
 		{
@@ -249,7 +249,7 @@ func TestGetActiveResourceName_PowerNodeConfig(t *testing.T) {
 		},
 		{
 			name: "no shared pool",
-			objs: []runtime.Object{&powerv1.PowerNodeState{
+			objs: []runtime.Object{&powerv1alpha1.PowerNodeState{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-node-power-state", Namespace: PowerNamespace},
 			}},
 			expectedName: "",
@@ -280,7 +280,7 @@ func TestGetActiveResourceName_PowerNodeConfig(t *testing.T) {
 func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 	tcases := []struct {
 		name        string
-		config      *powerv1.PowerNodeConfig
+		config      *powerv1alpha1.PowerNodeConfig
 		clientObjs  []runtime.Object
 		setupMock   func() *hostMock
 		expectErr   bool
@@ -288,11 +288,11 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 	}{
 		{
 			name:   "all profiles available",
-			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1.ReservedSpec{{Cores: []uint{0}, PowerProfile: "reserved-prof"}}, time.Now()),
+			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1alpha1.ReservedSpec{{Cores: []uint{0}, PowerProfile: "reserved-prof"}}, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "reserved-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "reserved-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{}},
 			},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
@@ -306,7 +306,7 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 			config: newPowerNodeConfig("c", "not-shared", nil, nil, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "not-shared", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: false}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "not-shared", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: false}},
 			},
 			setupMock: func() *hostMock {
 				return new(hostMock)
@@ -319,7 +319,7 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 			config: newPowerNodeConfig("c", "missing", nil, nil, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
 			},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
@@ -332,12 +332,12 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 		{
 			// This should be blocked by the CRD validation, but adding it here in case the fakeclient doesn't enforce it.
 			name: "duplicate core within same entry",
-			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1.ReservedSpec{
+			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1alpha1.ReservedSpec{
 				{Cores: []uint{0, 1, 0}, PowerProfile: "perf"},
 			}, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
 			},
 			setupMock: func() *hostMock {
 				return new(hostMock)
@@ -347,13 +347,13 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 		},
 		{
 			name: "overlapping reserved CPUs across entries",
-			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1.ReservedSpec{
+			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1alpha1.ReservedSpec{
 				{Cores: []uint{0, 1}, PowerProfile: "perf"},
 				{Cores: []uint{1, 2}, PowerProfile: "balanced"},
 			}, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
 			},
 			setupMock: func() *hostMock {
 				return new(hostMock)
@@ -363,11 +363,11 @@ func TestValidatePowerNodeConfigProfiles(t *testing.T) {
 		},
 		{
 			name:   "reserved profile unavailable",
-			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1.ReservedSpec{{Cores: []uint{0}, PowerProfile: "missing"}}, time.Now()),
+			config: newPowerNodeConfig("c", "shared-prof", nil, []powerv1alpha1.ReservedSpec{{Cores: []uint{0}, PowerProfile: "missing"}}, time.Now()),
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "shared-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{}},
 			},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
@@ -491,7 +491,7 @@ func TestConfigureSharedPool(t *testing.T) {
 func TestConfigureReservedPools(t *testing.T) {
 	tcases := []struct {
 		name             string
-		reserved         []powerv1.ReservedSpec
+		reserved         []powerv1alpha1.ReservedSpec
 		setupMock        func() *hostMock
 		expectedCPUCount int
 		expectedErrCount int
@@ -509,7 +509,7 @@ func TestConfigureReservedPools(t *testing.T) {
 		},
 		{
 			name:     "with profile",
-			reserved: []powerv1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf"}},
+			reserved: []powerv1alpha1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf"}},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				rp := new(poolMock)
@@ -533,7 +533,7 @@ func TestConfigureReservedPools(t *testing.T) {
 		},
 		{
 			name:     "without profile",
-			reserved: []powerv1.ReservedSpec{{Cores: []uint{0, 1}}},
+			reserved: []powerv1alpha1.ReservedSpec{{Cores: []uint{0, 1}}},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				rp := new(poolMock)
@@ -550,7 +550,7 @@ func TestConfigureReservedPools(t *testing.T) {
 		},
 		{
 			name:     "create pool failure, fallback to reserved",
-			reserved: []powerv1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf"}},
+			reserved: []powerv1alpha1.ReservedSpec{{Cores: []uint{0, 1}, PowerProfile: "perf"}},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				rp := new(poolMock)
@@ -587,14 +587,14 @@ func TestConfigureReservedPools(t *testing.T) {
 func TestCreateReservedPool(t *testing.T) {
 	tcases := []struct {
 		name        string
-		reserved    powerv1.ReservedSpec
+		reserved    powerv1alpha1.ReservedSpec
 		setupMock   func() *hostMock
 		expectErr   bool
 		errContains string
 	}{
 		{
 			name:     "success",
-			reserved: powerv1.ReservedSpec{Cores: []uint{0, 1}, PowerProfile: "perf"},
+			reserved: powerv1alpha1.ReservedSpec{Cores: []uint{0, 1}, PowerProfile: "perf"},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				pp := new(poolMock)
@@ -610,7 +610,7 @@ func TestCreateReservedPool(t *testing.T) {
 		},
 		{
 			name:     "add pool error",
-			reserved: powerv1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
+			reserved: powerv1alpha1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				h.On("AddExclusivePool", mock.Anything).Return(nil, assert.AnError)
@@ -621,7 +621,7 @@ func TestCreateReservedPool(t *testing.T) {
 		},
 		{
 			name:     "profile pool not found",
-			reserved: powerv1.ReservedSpec{Cores: []uint{0}, PowerProfile: "missing"},
+			reserved: powerv1alpha1.ReservedSpec{Cores: []uint{0}, PowerProfile: "missing"},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				pp := new(poolMock)
@@ -635,7 +635,7 @@ func TestCreateReservedPool(t *testing.T) {
 		},
 		{
 			name:     "set profile error",
-			reserved: powerv1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
+			reserved: powerv1alpha1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				pp := new(poolMock)
@@ -653,7 +653,7 @@ func TestCreateReservedPool(t *testing.T) {
 		},
 		{
 			name:     "set cpuIDs error",
-			reserved: powerv1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
+			reserved: powerv1alpha1.ReservedSpec{Cores: []uint{0}, PowerProfile: "perf"},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
 				pp := new(poolMock)
@@ -751,7 +751,7 @@ func TestCleanupPowerNodeConfigPools(t *testing.T) {
 func TestApplyPowerNodeConfig(t *testing.T) {
 	tcases := []struct {
 		name           string
-		config         *powerv1.PowerNodeConfig
+		config         *powerv1alpha1.PowerNodeConfig
 		conflictErrors []string
 		clientObjs     []runtime.Object
 		setupMock      func() *hostMock
@@ -764,7 +764,7 @@ func TestApplyPowerNodeConfig(t *testing.T) {
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
 				newPowerNodeState("test-node", ""),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "missing-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{}},
 			},
 			setupMock: func() *hostMock {
 				h := new(hostMock)
@@ -779,7 +779,7 @@ func TestApplyPowerNodeConfig(t *testing.T) {
 			clientObjs: []runtime.Object{
 				newTestNode("test-node", map[string]string{}),
 				newPowerNodeState("test-node", ""),
-				&powerv1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "test-prof", Namespace: PowerNamespace}, Spec: powerv1.PowerProfileSpec{Shared: true}},
+				&powerv1alpha1.PowerProfile{ObjectMeta: metav1.ObjectMeta{Name: "test-prof", Namespace: PowerNamespace}, Spec: powerv1alpha1.PowerProfileSpec{Shared: true}},
 			},
 			setupMock: func() *hostMock {
 				h := new(hostMock)

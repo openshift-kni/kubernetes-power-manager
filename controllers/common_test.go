@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	powerv1 "github.com/openshift-kni/kubernetes-power-manager/api/v1"
+	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,19 +90,19 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 	ctx := context.Background()
 	logger := logr.Discard()
 
-	defaultProfile := &powerv1.PowerProfile{
+	defaultProfile := &powerv1alpha1.PowerProfile{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "test-profile",
 			Namespace: PowerNamespace,
 		},
-		Spec: powerv1.PowerProfileSpec{
-			PStates: powerv1.PStatesConfig{
+		Spec: powerv1alpha1.PowerProfileSpec{
+			PStates: powerv1alpha1.PStatesConfig{
 				Min:      intStrFromInt(2000),
 				Max:      intStrFromInt(3000),
 				Governor: "powersave",
 				Epp:      "balance_performance",
 			},
-			CStates: powerv1.CStatesConfig{
+			CStates: powerv1alpha1.CStatesConfig{
 				Names: map[string]bool{
 					"C1":  true,
 					"C1E": true,
@@ -114,11 +114,11 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 
 	// buildMockClient creates a fake client whose SubResourcePatch captures the
 	// patched object into capturedPatch and returns patchErr.
-	buildMockClient := func(ctx context.Context, capturedPatch *powerv1.PowerNodeState, patchErr error) client.Client {
+	buildMockClient := func(ctx context.Context, capturedPatch *powerv1alpha1.PowerNodeState, patchErr error) client.Client {
 		clientMockObj := mock.Mock{}
 		clientFuncs := interceptor.Funcs{
 			SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-				if pns, ok := obj.(*powerv1.PowerNodeState); ok {
+				if pns, ok := obj.(*powerv1alpha1.PowerNodeState); ok {
 					*capturedPatch = *pns
 				}
 				return clientMockObj.MethodCalled("SubResourcePatch", ctx, client, subResourceName, obj, patch, opts).Error(0)
@@ -132,12 +132,12 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 	tcases := []struct {
 		testCase                string
 		nodeName                string
-		profile                 *powerv1.PowerProfile
+		profile                 *powerv1alpha1.PowerProfile
 		profileErr              error
 		patchErr                error
 		expectError             bool
 		expectedErrMsg          string
-		verifyPatchedObject     func(*testing.T, *powerv1.PowerNodeState)
+		verifyPatchedObject     func(*testing.T, *powerv1alpha1.PowerNodeState)
 		shouldVerifyPatchObject bool
 	}{
 		{
@@ -151,9 +151,9 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 			nodeName:                "test-node",
 			expectError:             false,
 			shouldVerifyPatchObject: true,
-			verifyPatchedObject: func(t *testing.T, pns *powerv1.PowerNodeState) {
+			verifyPatchedObject: func(t *testing.T, pns *powerv1alpha1.PowerNodeState) {
 				// Verify TypeMeta and ObjectMeta are set correctly.
-				assert.Equal(t, "power.openshift.io/v1", pns.APIVersion, "APIVersion should be set for SSA")
+				assert.Equal(t, "power.cluster-power-manager.github.io/v1alpha1", pns.APIVersion, "APIVersion should be set for SSA")
 				assert.Equal(t, "PowerNodeState", pns.Kind, "Kind should be set for SSA")
 				assert.Equal(t, "test-node-power-state", pns.Name)
 				assert.Equal(t, PowerNamespace, pns.Namespace)
@@ -171,9 +171,9 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 			profileErr:              fmt.Errorf("invalid P-states configuration: max frequency (2000) cannot be lower than the min frequency (3000)"),
 			shouldVerifyPatchObject: true,
 			expectError:             false,
-			verifyPatchedObject: func(t *testing.T, pns *powerv1.PowerNodeState) {
+			verifyPatchedObject: func(t *testing.T, pns *powerv1alpha1.PowerNodeState) {
 				// Verify TypeMeta and ObjectMeta are set for SSA.
-				assert.Equal(t, "power.openshift.io/v1", pns.APIVersion, "APIVersion should be set for SSA")
+				assert.Equal(t, "power.cluster-power-manager.github.io/v1alpha1", pns.APIVersion, "APIVersion should be set for SSA")
 				assert.Equal(t, "PowerNodeState", pns.Kind, "Kind should be set for SSA")
 				assert.Equal(t, "test-node-power-state", pns.Name)
 				assert.Equal(t, PowerNamespace, pns.Namespace)
@@ -189,7 +189,7 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 		{
 			testCase:    "PowerNodeState not found should return error to requeue",
 			nodeName:    "test-node",
-			patchErr:    apierrors.NewNotFound(schema.GroupResource{Group: "power.openshift.io", Resource: "powernodestates"}, "test-node-power-state"),
+			patchErr:    apierrors.NewNotFound(schema.GroupResource{Group: "power.cluster-power-manager.github.io", Resource: "powernodestates"}, "test-node-power-state"),
 			expectError: true,
 		},
 		{
@@ -204,19 +204,19 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 			nodeName:                "test-node",
 			expectError:             false,
 			shouldVerifyPatchObject: true,
-			profile: &powerv1.PowerProfile{
+			profile: &powerv1alpha1.PowerProfile{
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "dpdk-profile",
 					Namespace: PowerNamespace,
 				},
-				Spec: powerv1.PowerProfileSpec{
-					PStates: powerv1.PStatesConfig{
+				Spec: powerv1alpha1.PowerProfileSpec{
+					PStates: powerv1alpha1.PStatesConfig{
 						Min:      intStrFromInt(2000),
 						Max:      intStrFromInt(3000),
 						Governor: "userspace",
 						Epp:      "performance",
 					},
-					CpuScalingPolicy: &powerv1.CpuScalingPolicy{
+					CpuScalingPolicy: &powerv1alpha1.CpuScalingPolicy{
 						WorkloadType:               "polling-dpdk",
 						SamplePeriod:               &v1.Duration{Duration: 10 * time.Millisecond},
 						CooldownPeriod:             &v1.Duration{Duration: 30 * time.Millisecond},
@@ -228,7 +228,7 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 					},
 				},
 			},
-			verifyPatchedObject: func(t *testing.T, pns *powerv1.PowerNodeState) {
+			verifyPatchedObject: func(t *testing.T, pns *powerv1alpha1.PowerNodeState) {
 				assert.Len(t, pns.Status.PowerProfiles, 1, "Should have 1 profile")
 				assert.Equal(t, "dpdk-profile", pns.Status.PowerProfiles[0].Name)
 				expectedConfig := `Min: 2000, Max: 3000, Governor: userspace, EPP: performance, C-States: , CpuScalingPolicy: {"workloadType":"polling-dpdk","samplePeriod":"10ms","cooldownPeriod":"30ms","targetUsage":80,"allowedUsageDifference":5,"allowedFrequencyDifference":25,"scalePercentage":50,"fallbackFreqPercent":0}`
@@ -240,7 +240,7 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.testCase, func(t *testing.T) {
-			capturedPatch := &powerv1.PowerNodeState{}
+			capturedPatch := &powerv1alpha1.PowerNodeState{}
 			mockClient := buildMockClient(ctx, capturedPatch, tc.patchErr)
 			profile := tc.profile
 			if profile == nil {
@@ -267,7 +267,7 @@ func Test_addPowerNodeStatusProfileEntry(t *testing.T) {
 func Test_formatCpuScalingPolicy(t *testing.T) {
 	tcases := []struct {
 		name        string
-		policy      *powerv1.CpuScalingPolicy
+		policy      *powerv1alpha1.CpuScalingPolicy
 		expected    string
 		expectError bool
 	}{
@@ -278,12 +278,12 @@ func Test_formatCpuScalingPolicy(t *testing.T) {
 		},
 		{
 			name:     "Empty policy returns empty string",
-			policy:   &powerv1.CpuScalingPolicy{},
+			policy:   &powerv1alpha1.CpuScalingPolicy{},
 			expected: "",
 		},
 		{
 			name: "Full policy with all fields",
-			policy: &powerv1.CpuScalingPolicy{
+			policy: &powerv1alpha1.CpuScalingPolicy{
 				WorkloadType:               "polling-dpdk",
 				SamplePeriod:               &v1.Duration{Duration: 10 * time.Millisecond},
 				CooldownPeriod:             &v1.Duration{Duration: 30 * time.Millisecond},
@@ -297,7 +297,7 @@ func Test_formatCpuScalingPolicy(t *testing.T) {
 		},
 		{
 			name: "Policy with partial fields omits nil fields",
-			policy: &powerv1.CpuScalingPolicy{
+			policy: &powerv1alpha1.CpuScalingPolicy{
 				WorkloadType:   "polling-dpdk",
 				SamplePeriod:   &v1.Duration{Duration: 20 * time.Millisecond},
 				CooldownPeriod: &v1.Duration{Duration: 50 * time.Millisecond},
@@ -447,7 +447,7 @@ func Test_removePowerNodeStatusProfileEntry(t *testing.T) {
 	ctx := context.Background()
 	logger := logr.Discard()
 	scheme := runtime.NewScheme()
-	_ = powerv1.AddToScheme(scheme)
+	_ = powerv1alpha1.AddToScheme(scheme)
 	_ = v1.AddMetaToScheme(scheme)
 
 	tcases := []struct {
@@ -485,7 +485,7 @@ func Test_removePowerNodeStatusProfileEntry(t *testing.T) {
 			profileName: "test-profile",
 			expectError: false,
 			setupMockClient: func() client.Client {
-				pns := &powerv1.PowerNodeState{
+				pns := &powerv1alpha1.PowerNodeState{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "test-node-power-state", Namespace: PowerNamespace,
 					},

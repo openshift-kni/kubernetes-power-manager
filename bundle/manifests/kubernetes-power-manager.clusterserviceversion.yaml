@@ -5,7 +5,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "PowerConfig",
           "metadata": {
             "labels": {
@@ -25,7 +25,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "PowerNodeConfig",
           "metadata": {
             "name": "amd64-config",
@@ -54,7 +54,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "PowerProfile",
           "metadata": {
             "labels": {
@@ -81,7 +81,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "power.openshift.io/v1",
+          "apiVersion": "power.cluster-power-manager.github.io/v1alpha1",
           "kind": "Uncore",
           "metadata": {
             "labels": {
@@ -116,7 +116,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-04-07T23:59:17Z"
+    createdAt: "2026-05-04T17:03:18Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: kubernetes-power-manager.v0.0.1
@@ -128,32 +128,32 @@ spec:
       - description: PowerConfig is the Schema for the powerconfigs API
         displayName: Power Config
         kind: PowerConfig
-        name: powerconfigs.power.openshift.io
-        version: v1
+        name: powerconfigs.power.cluster-power-manager.github.io
+        version: v1alpha1
       - description: |-
           PowerNodeConfig is the Schema for the powernodeconfigs API.
           It configures shared and reserved CPU pools on nodes matching spec.nodeSelector.
         displayName: Power Node Config
         kind: PowerNodeConfig
-        name: powernodeconfigs.power.openshift.io
-        version: v1
+        name: powernodeconfigs.power.cluster-power-manager.github.io
+        version: v1alpha1
       - description: |-
           PowerNodeState is the Schema for the powernodestates API
           It provides per-node status for power management configuration
         displayName: Power Node State
         kind: PowerNodeState
-        name: powernodestates.power.openshift.io
-        version: v1
+        name: powernodestates.power.cluster-power-manager.github.io
+        version: v1alpha1
       - description: PowerProfile is the Schema for the powerprofiles API
         displayName: Power Profile
         kind: PowerProfile
-        name: powerprofiles.power.openshift.io
-        version: v1
+        name: powerprofiles.power.cluster-power-manager.github.io
+        version: v1alpha1
       - description: Uncore is the Schema for the uncores API
         displayName: Uncore
         kind: Uncore
-        name: uncores.power.openshift.io
-        version: v1
+        name: uncores.power.cluster-power-manager.github.io
+        version: v1alpha1
   description: The Kubernetes Power Manager bridges the gap between the container orchestration layer and hardware feature enablement.
   displayName: Kubernetes Power Manager
   icon:
@@ -165,7 +165,7 @@ spec:
         - rules:
             - apiGroups:
                 - ""
-                - power.openshift.io
+                - power.cluster-power-manager.github.io
                 - apps
               resources:
                 - nodes
@@ -258,7 +258,7 @@ spec:
         - rules:
             - apiGroups:
                 - ""
-                - power.openshift.io
+                - power.cluster-power-manager.github.io
                 - apps
                 - coordination.k8s.io
               resources:
@@ -320,9 +320,9 @@ spec:
       generateName: vpowernodeconfig.kb.io
       rules:
         - apiGroups:
-            - power.openshift.io
+            - power.cluster-power-manager.github.io
           apiVersions:
-            - v1
+            - v1alpha1
           operations:
             - CREATE
             - UPDATE
@@ -331,7 +331,7 @@ spec:
       sideEffects: None
       targetPort: 9443
       type: ValidatingAdmissionWebhook
-      webhookPath: /validate-power-openshift-io-v1-powernodeconfig
+      webhookPath: /validate-power-cluster-power-manager-github-io-v1alpha1-powernodeconfig
     - admissionReviewVersions:
         - v1
       containerPort: 443
@@ -340,9 +340,9 @@ spec:
       generateName: vpowerprofile.kb.io
       rules:
         - apiGroups:
-            - power.openshift.io
+            - power.cluster-power-manager.github.io
           apiVersions:
-            - v1
+            - v1alpha1
           operations:
             - CREATE
             - UPDATE
@@ -352,7 +352,7 @@ spec:
       sideEffects: None
       targetPort: 9443
       type: ValidatingAdmissionWebhook
-      webhookPath: /validate-power-openshift-io-v1-powerprofile
+      webhookPath: /validate-power-cluster-power-manager-github-io-v1alpha1-powerprofile
     - admissionReviewVersions:
         - v1
       containerPort: 443
@@ -361,9 +361,9 @@ spec:
       generateName: vuncore.kb.io
       rules:
         - apiGroups:
-            - power.openshift.io
+            - power.cluster-power-manager.github.io
           apiVersions:
-            - v1
+            - v1alpha1
           operations:
             - CREATE
             - UPDATE
@@ -372,4 +372,4 @@ spec:
       sideEffects: None
       targetPort: 9443
       type: ValidatingAdmissionWebhook
-      webhookPath: /validate-power-openshift-io-v1-uncore
+      webhookPath: /validate-power-cluster-power-manager-github-io-v1alpha1-uncore
