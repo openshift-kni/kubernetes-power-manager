@@ -27,10 +27,10 @@ import (
 
 	e "errors"
 
+	powerv1alpha1 "github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1"
+	"github.com/cluster-power-manager/cluster-power-manager/internal/scaling"
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
-	"github.com/openshift-kni/kubernetes-power-manager/internal/scaling"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,8 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/podresourcesclient"
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/podstate"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/podresourcesclient"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/podstate"
 )
 
 const (

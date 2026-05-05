@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"testing"
 
-	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/podresourcesclient"
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/podstate"
+	powerv1alpha1 "github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/podresourcesclient"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/podstate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

@@ -5,31 +5,31 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: kubernetes-power-manager
-repo: github.com/openshift-kni/kubernetes-power-manager
+repo: github.com/cluster-power-manager/cluster-power-manager
 resources:
 - domain: cluster-power-manager.github.io
   group: power
   kind: PowerProfile
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  path: github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1
   version: v1alpha1
 - domain: cluster-power-manager.github.io
   group: power
   kind: PowerConfig
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  path: github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1
   version: v1alpha1
 - domain: cluster-power-manager.github.io
   group: power
   kind: PowerNodeState
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  path: github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1
   version: v1alpha1
 - domain: cluster-power-manager.github.io
   group: power
   kind: PowerNodeConfig
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  path: github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1
   version: v1alpha1
 - domain: cluster-power-manager.github.io
   group: power
   kind: Uncore
-  path: github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1
+  path: github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1
   version: v1alpha1
 version: "3"

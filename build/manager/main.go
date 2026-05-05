@@ -31,10 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
+	powerv1alpha1 "github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1"
 
-	"github.com/openshift-kni/kubernetes-power-manager/controllers"
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/state"
+	"github.com/cluster-power-manager/cluster-power-manager/controllers"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/state"
 	// +kubebuilder:scaffold:imports
 )
 

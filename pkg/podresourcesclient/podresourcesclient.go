@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/cpuset"
-	"github.com/openshift-kni/kubernetes-power-manager/pkg/util"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/cpuset"
+	"github.com/cluster-power-manager/cluster-power-manager/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/apimachinery/pkg/api/errors"

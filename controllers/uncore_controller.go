@@ -22,9 +22,9 @@ import (
 	"os"
 	"strings"
 
+	powerv1alpha1 "github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

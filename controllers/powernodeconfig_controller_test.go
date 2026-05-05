@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	powerv1alpha1 "github.com/cluster-power-manager/cluster-power-manager/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/intel/power-optimization-library/pkg/power"
-	powerv1alpha1 "github.com/openshift-kni/kubernetes-power-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zapcore"

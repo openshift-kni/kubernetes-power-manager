@@ -1,4 +1,4 @@
-module github.com/openshift-kni/kubernetes-power-manager
+module github.com/cluster-power-manager/cluster-power-manager
 
 go 1.24.0
 
