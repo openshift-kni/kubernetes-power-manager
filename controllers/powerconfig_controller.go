@@ -60,7 +60,6 @@ type PowerConfigReconciler struct {
 // +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powerconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=power.cluster-power-manager.github.io,resources=powernodestates/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 func (r *PowerConfigReconciler) Reconcile(c context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()

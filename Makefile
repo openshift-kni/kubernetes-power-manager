@@ -149,7 +149,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-.PHONY: all test build images images-ocp run
+.PHONY: all test build images images-ocp build-push-images build-push-images-ocp run
 
 all: manifests generate install
 
@@ -183,6 +183,16 @@ images-ocp: generate manifests
 	 echo "Building images for OCP $(IMG) and $(IMG_AGENT)"
 	 $(IMGTOOL) build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" --build-arg="MANIFEST=build/manifests/ocp/power-node-agent-ds.yaml" -f build/Dockerfile --platform $(PLATFORM) -t ${IMG} .
 	 $(IMGTOOL) build --build-arg="BASE_IMAGE=$(OCP_IMAGE)" -f build/Dockerfile.nodeagent --platform $(PLATFORM) -t ${IMG_AGENT} .
+
+# Build and push single-architecture images
+build-push-images: images
+	$(IMGTOOL) push ${IMG}
+	$(IMGTOOL) push ${IMG_AGENT}
+
+build-push-images-ocp: images-ocp
+	$(IMGTOOL) push ${IMG}
+	$(IMGTOOL) push ${IMG_AGENT}
+
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
 	go run ./build/manager/main.go
@@ -358,10 +368,7 @@ endif
 endif
 	@echo "Multi-arch images built and pushed successfully"
 
-.PHONY: docker-push controller-gen kustomize bundle bundle-build bundle-push
-# Push the image
-push:
-	$(IMGTOOL) push ${IMG}
+.PHONY: controller-gen kustomize bundle bundle-build bundle-push
 
 # Generate bundle manifests and metadata, then validate generated files.
 bundle: update manifests kustomize operator-sdk
@@ -455,10 +462,13 @@ gofmt:
 	gofmt -w .
 
 update:
+ifeq (false, $(OCP))
 	sed -i 's|image: .*|image: $(IMG)|' config/manager/manager.yaml
-	sed -i 's|image: .*|image: $(IMG)|' config/manager/ocp/manager.yaml
 	sed -i 's|image: .*|image: $(IMG_AGENT)|' build/manifests/power-node-agent-ds.yaml
+else
+	sed -i 's|image: .*|image: $(IMG)|' config/manager/ocp/manager.yaml
 	sed -i 's|image: .*|image: $(IMG_AGENT)|' build/manifests/ocp/power-node-agent-ds.yaml
+endif
 
 # markdownlint rules, following: https://github.com/openshift/enhancements/blob/master/Makefile
 .PHONY: markdownlint-image

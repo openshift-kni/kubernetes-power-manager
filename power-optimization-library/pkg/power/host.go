@@ -136,7 +136,7 @@ func (host *hostImpl) GetVendorID() string {
 // GetFromLscpu returns the value of a certain key from the lscpu output.
 var GetFromLscpu = func(regex string) (string, error) {
 	regexp.MustCompile(regex)
-	cmdStr := fmt.Sprintf("lscpu | egrep -w \"%s\" | cut -d ':' -f 2", regex)
+	cmdStr := fmt.Sprintf("lscpu | grep -Ew \"%s\" | cut -d ':' -f 2", regex)
 	cmd := exec.Command("bash", "-c", cmdStr)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

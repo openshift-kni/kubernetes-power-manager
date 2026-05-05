@@ -53,11 +53,3 @@ rules:
   - uncores/finalizers
   verbs:
   - update
-- apiGroups:
-  - security.openshift.io
-  resourceNames:
-  - privileged
-  resources:
-  - securitycontextconstraints
-  verbs:
-  - use
